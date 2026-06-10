@@ -76,7 +76,8 @@ Findings from reading `index.html`. Severity: 🔴 high · 🟠 medium · 🟡 l
   recommend extracting the Vue app + storage + import/export into a shared
   `public/js/app.js`, with each HTML file supplying only its localized strings (an i18n
   string map). This is the highest-leverage refactor: it halves the cost of **every** feature
-  below and removes a whole class of "fixed in EN, forgot ZH" bugs.
+  below and removes a whole class of "fixed in EN, forgot ZH" bugs. **See Section 9 for the
+  full i18n architecture and how to add new languages.**
 - 🟡 **TECH-DEBT-2 — Drag handlers mutate a computed.** `dragenter` splices
   `this.filteredTodos`, which is a `computed` derived from `todos`. Mutating it is an
   anti-pattern that happens to work only because it returns the same array reference for the
@@ -93,44 +94,44 @@ Findings from reading `index.html`. Severity: 🔴 high · 🟠 medium · 🟡 l
 **Goal:** view the same list on two devices; a manual page refresh to pull latest is
 acceptable. We must NOT turn this into a login-required, server-heavy product.
 
-### Recommended approach (tiered, pick one)
+> **Decision (2026-06-10):** No server for now. **Ship file/clipboard-based sync (Option C)**
+> as the supported path. The hosted "Sync ID" approach (Option A) is documented below as a
+> **possible future upgrade** if manual sync proves too tedious — not built yet. A hard
+> requirement either way: **import must detect and dedupe** so re-importing the same export
+> doesn't create duplicates.
 
-**Option A — "Sync code" via a tiny hosted KV (RECOMMENDED).**
-- Use a free, no-auth-friendly key-value endpoint. Good fits: **Cloudflare Workers + KV**
-  (you control it, generous free tier), or a hosted JSON bin service. The app gets a
-  **"Sync ID"** (a random, hard-to-guess token the user generates once and enters on each
-  device, like a shared room key).
-- Flow: **Push** = `PUT {syncId} -> {todos, recycleBin, slogan, updatedAt}`. **Pull** =
-  `GET {syncId}` on load / on a "Sync now" button. Last-write-wins by `updatedAt`, with a
-  visible timestamp so the user knows what they're looking at.
-- Pros: matches the "refresh is fine" requirement exactly, no accounts, ~100 lines, keeps the
-  static premise (the HTML stays static; it just talks to one URL). Cons: requires standing up
-  one tiny Worker (or trusting a third-party bin).
-- **Privacy/security notes:** treat the Sync ID as a bearer secret (anyone with it can
-  read/write). Use a long random id. Optionally add client-side encryption (passphrase →
-  WebCrypto AES-GCM) so the server only stores ciphertext — nice-to-have, not required for v1.
+### Chosen approach — Option C: file / clipboard sync via a cloud drive
 
-**Option B — Browser-native, zero-server.** Rely on the browser's own account sync (Chrome/
-Safari already sync `localStorage`? — **no, they do not**), so this isn't viable for
-cross-device. Skip.
+- Lean on the improved export/import (Section 5): export to clipboard or file, drop the file
+  into **iCloud Drive / Dropbox / Google Drive**, then import on the other device (or just
+  paste from clipboard if both devices share a clipboard, e.g. Apple Universal Clipboard).
+- Zero new infrastructure, no accounts, fully under the user's control. Ships **for free** as
+  part of Section 5. A page refresh after import shows the synced list — matches the
+  "refresh is fine" requirement.
+- **Dedupe on import is mandatory (see IO-6).** Each todo carries a stable id (BUG-2), so a
+  re-import of an overlapping export merges cleanly instead of doubling entries.
+- Trade-off accepted: sync is **manual** (you choose when to export/import). That's fine for
+  the stated goal of "see the same list on both devices with a refresh."
 
-**Option C — File-based "sync" via a cloud drive.** Lean on the improved export/import
-(Section 5): export to clipboard/file, drop into iCloud/Dropbox, import on the other device.
-Zero new infrastructure; fully manual. This is effectively **free and ships with Section 5**,
-and is a fine fallback / v0 while Option A is built.
+### Future upgrade (documented, NOT built) — Option A: hosted "Sync ID" via tiny KV
 
-### Plan
-1. Ship **Option C** behavior for free as part of Section 5 (clipboard import/export).
-2. Build **Option A** as the real feature: a small "Sync" panel in Settings with
-   *Generate Sync ID*, *Enter Sync ID*, *Push*, *Pull*, *auto-pull on load* toggle, and a
-   "last synced" timestamp. Back it with a Cloudflare Worker + KV (document the Worker
-   separately; keep its URL configurable).
-3. Conflict handling: last-write-wins keyed on `updatedAt`; warn if remote is newer than the
-   local copy you're about to overwrite.
+If/when manual sync becomes annoying, add near-automatic sync without accounts:
+- A free, no-auth-friendly key-value endpoint — **Cloudflare Workers + KV** (you control it,
+  generous free tier) or a hosted JSON-bin service. The app gets a **"Sync ID"**: a long,
+  hard-to-guess token generated once and entered on each device, like a shared room key.
+- Flow: **Push** = `PUT {syncId} -> {todos, recycleBin, slogan, settings, updatedAt}`.
+  **Pull** = `GET {syncId}` on load and/or a "Sync now" button. Last-write-wins by
+  `updatedAt`, with a visible "last synced" timestamp; warn if remote is newer than the local
+  copy about to be overwritten.
+- Keeps the static premise (the HTML stays static; it just talks to one configurable URL).
+- **Privacy/security notes for later:** treat the Sync ID as a bearer secret (anyone with it
+  can read/write) — use a long random id. Optionally add client-side encryption (passphrase →
+  WebCrypto AES-GCM) so the server only ever stores ciphertext.
+- Cost to add later is small precisely because Section 5 already centralizes the
+  export/import/merge payload — Option A would reuse that same serialization + dedupe logic.
 
-> Decision needed from owner: are you willing to deploy a tiny Cloudflare Worker (best
-> experience), or should we stick to clipboard/file sync (Option C) only? This gates the
-> effort estimate for the sync line item.
+**Rejected — Option B (browser-native sync):** Chrome/Safari do **not** sync `localStorage`
+across devices, so there is no zero-server native path. Not viable.
 
 ---
 
@@ -174,6 +175,18 @@ and is a fine fallback / v0 while Option A is built.
   plain text; validate each entry; report how many were imported/skipped.
 - **IO-5 — Round-trip everything:** export should include `recycleBin` + slogan + settings so
   it doubles as a full backup (and as the Option C manual-sync payload).
+- **IO-6 — Dedupe on import (REQUIRED — this is what makes file/clipboard sync usable).**
+  Re-importing an export that overlaps the current list must **not** create duplicates. Merge
+  strategy:
+  1. **Primary key = stable todo `id`** (from BUG-2). If an incoming id already exists, treat
+     it as the *same item* and update-in-place (or skip) rather than appending.
+  2. **Secondary guard = normalized title** (trimmed + lowercased, optionally whitespace-
+     collapsed) for items that legitimately have no matching id (e.g. todos created on a device
+     that predates stable ids, or hand-pasted bulk text). Same normalized title + same
+     `completed` state ⇒ duplicate ⇒ skip.
+  3. Report the outcome: "Imported N new, updated M, skipped K duplicates." This makes repeated
+     manual syncs safe and predictable.
+  - Same dedupe path is reused by **bulk entry (IO-3)** so pasting a list twice won't double it.
 
 ---
 
@@ -227,13 +240,17 @@ shared-code refactor before the big features so we only build them once.
 8. **SEC-1 / BUG-3** Harden alert (`textContent`) and import parser. _(small–medium)_
 
 ### Phase 2 — High-value features
-9. **IO-1…IO-5** Clipboard export/import + bulk entry + hardened parser. _(medium; also delivers Option C "manual sync")_
+9. **IO-1…IO-6** Clipboard export/import + bulk entry + hardened parser + **dedupe-on-import**.
+   _(medium; this IS the supported sync path — file/clipboard via iCloud/Dropbox)_
 10. **THM-1 / THM-2 / SET-1** Settings panel + theme engine + 5 themes. _(medium; mostly CSS)_
 11. **QOL-2** Auto-sort/alphabetize toggle. _(small)_
 
-### Phase 3 — Larger / decision-gated
+### Phase 3 — Larger
 12. **MOB-1** Touch drag-to-reorder (+ fix TECH-DEBT-2) and **MOB-2…MOB-5** mobile polish. _(medium–large; headline mobile item)_
-13. **Sync Option A** Cloudflare Worker + KV "Sync ID" flow. _(large; gated on owner's deploy decision — see Section 3)_
+
+### Future / not scheduled
+- **Sync Option A** (hosted Cloudflare Worker + KV "Sync ID"). Documented in Section 3 as a
+  possible later upgrade if manual file/clipboard sync proves tedious. Not built now.
 
 ### Effort/impact summary
 
@@ -247,20 +264,125 @@ shared-code refactor before the big features so we only build them once.
 | TECH-DEBT-1 dedupe EN/ZH | High (leverage) | Medium | 1 |
 | BUG-2 stable IDs | Med | Small | 1 |
 | SEC-1 + BUG-3 harden | Med | Small-Med | 1 |
-| IO clipboard + bulk entry | High | Medium | 2 |
+| IO clipboard + bulk entry + dedupe | High | Medium | 2 |
 | Themes + settings panel | High | Medium | 2 |
 | QOL-2 auto-sort | Med | Small | 2 |
 | MOB touch drag + polish | High | Med-Large | 3 |
-| Sync (Worker + KV) | High | Large | 3 |
+| Sync (Worker + KV) | High | Large | Future (deferred) |
 
 ---
 
-## 8. Open questions for the owner
+## 8. Decisions & open questions
 
-1. **Sync infrastructure:** OK to deploy a tiny Cloudflare Worker + KV (best UX), or keep
-   sync to clipboard/file only for now? (Gates item 13.)
-2. **Refactor appetite:** Approve the Phase 1 dedupe of `index.html` / `index-zh.html` into a
-   shared `app.js`? It's the highest-leverage change but touches both files broadly.
-3. **Theme direction:** any specific themes/brand colors you want among the 5 (Dark is assumed)?
-4. **SCSS workflow:** should we keep editing `.scss` and recompile, or are direct `.css` edits
-   acceptable given no build is committed?
+**Decided (2026-06-10):**
+- ✅ **Sync:** No server for now. File/clipboard sync (Option C) is the supported path, with
+  **mandatory dedupe-on-import** (IO-6). Hosted "Sync ID" (Option A) documented as a possible
+  future upgrade only.
+- ✅ **Refactor:** Approved — dedupe `index.html` / `index-zh.html` into a shared `app.js` with
+  an i18n string map (Phase 1 / TECH-DEBT-1). See **Section 9** for how this works.
+
+**Still open:**
+1. **Theme direction:** any specific themes/brand colors you want among the 5 (Dark is assumed)?
+2. **SCSS workflow:** keep editing `.scss` and recompile, or are direct `.css` edits acceptable
+   given no build is committed?
+
+---
+
+## 9. Internationalization (i18n) architecture — EN/ZH dedupe & adding languages
+
+This is the plan for **TECH-DEBT-1**. Today, `index.html` (English) and `index-zh.html`
+(Chinese) are two near-complete copies — the markup, the Vue logic, the import/export scripts,
+the empty-state tips — all duplicated, with only the visible text differing. Every behavior
+change has to be made in both files, and the two have already drifted.
+
+### How translation will work
+
+**Separate the three things that are currently tangled together:**
+
+1. **App logic + markup → one shared `public/js/app.js`.** The Vue instance, storage,
+   drag/sort, import/export — all the behavior — moves into a single file that both HTML pages
+   load. There is exactly one copy of the logic from then on.
+2. **Translatable text → a string map keyed by language.** Instead of hard-coding
+   `"Add a to-do item..."` in the template, the template references a key and Vue looks it up
+   for the active language:
+
+   ```js
+   // public/js/i18n.js
+   const I18N = {
+     en: {
+       addPlaceholder: "Add a to-do item...",
+       add: "Add", markAllDone: "Mark All Done",
+       filterAll: "All", filterOngoing: "In Progress",
+       filterCompleted: "Completed", filterTrash: "Trash",
+       itemsRemaining: "{n} items remaining",
+       allCompleted: "All completed, good job!",
+       defaultSlogan: "Act Now, Simplify Life.☕",
+       confirmMarkAll: "Confirm to mark all as completed?",
+       // ...one entry per piece of visible text
+     },
+     zh: {
+       addPlaceholder: "添加一个待办事项...",
+       add: "添加", markAllDone: "全部完成",
+       filterAll: "全部", filterOngoing: "进行中",
+       filterCompleted: "已完成", filterTrash: "回收站",
+       itemsRemaining: "还剩 {n} 项",
+       allCompleted: "全部完成，做得好！",
+       defaultSlogan: "立即行动，简化生活。☕",
+       confirmMarkAll: "确认全部标记为已完成？",
+       // ...same keys as `en`
+     },
+   };
+   ```
+
+3. **In the Vue app**, expose a tiny translator and use it in the template:
+
+   ```js
+   data() {
+     return { lang: localStorage.getItem('uiineed-todos-lang') || 'en', /* ... */ };
+   },
+   computed: {
+     t() {                       // usage in template: {{ t.add }}, :placeholder="t.addPlaceholder"
+       return I18N[this.lang] || I18N.en;   // fall back to English if a key/lang is missing
+     }
+   }
+   ```
+
+   For strings with variables, a small helper handles the `{n}` placeholder, e.g.
+   `tf('itemsRemaining', { n: count })`.
+
+**The two HTML files then become thin shells.** They share the same `<div id="todo-app">`
+template (ideally extracted into one shared HTML partial or simply kept identical and verified
+by a diff check), and differ only in:
+- `<html lang="…">`, `<title>`, and the `<meta>` description/keywords (SEO text per language),
+- which language they default to.
+
+The existing language switch (`En / 中`) keeps working — but instead of being two unrelated
+pages, switching language just sets `localStorage['uiineed-todos-lang']` and the same app
+re-renders with a different string set. We can keep `index.html` / `index-zh.html` as
+SEO-friendly entry URLs (each pre-setting its language) while sharing 100% of the code.
+
+### How to add another language (e.g. Spanish)
+
+Once the above is in place, adding a language is **data-only — no logic changes:**
+
+1. **Add one block to `I18N`** in `i18n.js` with the same keys:
+   ```js
+   es: { addPlaceholder: "Añadir una tarea...", add: "Añadir", /* ...all keys... */ }
+   ```
+2. **Add it to the language switcher** (one more link/option in the switch UI).
+3. *(Optional, for SEO)* create `index-es.html` as a thin shell that defaults `lang` to `es`,
+   mirroring how `index-zh.html` works. Not required for the feature to function — the
+   in-app switcher alone is enough.
+
+**Guardrails worth adding:**
+- **English is the fallback.** Missing keys in any language resolve to `I18N.en`, so a
+  half-translated language never shows blanks.
+- A trivial **dev check** (a few lines, or a tiny script) can assert every language has the
+  same set of keys as `en`, catching "forgot to translate X" before it ships.
+- Keep keys **semantic** (`filterTrash`, not `button7`) so translators have context.
+
+### Why this is worth doing first (Phase 1)
+
+It's medium effort but it **removes the EN/ZH drift permanently** and makes every later feature
+(themes, settings, clipboard sync, mobile drag) a single implementation instead of two. It also
+turns "support more languages" from a copy-the-whole-file chore into appending one dictionary.
