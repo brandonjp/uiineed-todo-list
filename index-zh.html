@@ -1,7 +1,7 @@
 
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -20,84 +20,9 @@
         const userLanguage = localStorage.getItem('uiineed-todos-lang');
         if (userLanguage && userLanguage !== "zh") window.location.href = (window.location.pathname === "/") ? 'index.html' : window.location.href.replace('index-zh.html', 'index.html');
     </script>
-    <script>
-        // 保存原生alert备用
-        const nativeAlert = window.alert;
-
-        // 重写alert方法
-        window.alert = function(message, title = '提示') {
-            return new Promise((resolve) => {
-                const overlay = document.createElement('div'); // 遮罩层
-                overlay.className = 'custom-alert-overlay';
-                const alertBox = document.createElement('div'); // 提示框
-                alertBox.className = 'custom-alert';
-                alertBox.innerHTML = `
-<div class="custom-alert-title">${title}</div>
-<div class="custom-alert-content">${message}</div>
-<div class="custom-alert-buttons">
-    <button class="custom-alert-btn confirm">确定</button>
-</div>
-                `;
-                overlay.appendChild(alertBox);
-                document.body.appendChild(overlay);
-                const confirmBtn = alertBox.querySelector('.confirm');
-                confirmBtn.addEventListener('click', () => {
-                    alertBox.style.animation = 'popOut 0.3s forwards';
-                    setTimeout(() => {
-                        document.body.removeChild(overlay);
-                        resolve(true);
-                    }, 300);
-                });
-                overlay.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') confirmBtn.click();
-                });
-                confirmBtn.focus();
-            });
-        };
-
-        // 保存原生confirm备用
-        const nativeConfirm = window.alert;
-
-        // 重写confirm方法
-        window.confirm = function(message, title = '请确认') {
-            return new Promise((resolve) => {
-                const overlay = document.createElement('div');
-                overlay.className = 'custom-alert-overlay';
-                const alertBox = document.createElement('div');
-                alertBox.className = 'custom-alert';
-                alertBox.innerHTML = `
-<div class="custom-alert-title">${title}</div>
-<div class="custom-alert-content">${message}</div>
-<div class="custom-alert-buttons">
-    <button class="custom-alert-btn cancel">取消</button>
-    <button class="custom-alert-btn confirm">确定</button>
-</div>
-                `;
-                overlay.appendChild(alertBox);
-                document.body.appendChild(overlay);
-                const confirmBtn = alertBox.querySelector('.confirm');
-                const cancelBtn = alertBox.querySelector('.cancel');
-                confirmBtn.addEventListener('click', () => {
-                    alertBox.style.animation = 'popOut 0.3s forwards';
-                    setTimeout(() => {
-                        document.body.removeChild(overlay);
-                        resolve(true);
-                    }, 300);
-                });
-                cancelBtn.addEventListener('click', () => {
-                    alertBox.style.animation = 'popOut 0.3s forwards';
-                    setTimeout(() => {
-                        document.body.removeChild(overlay);
-                        resolve(false);
-                    }, 300);
-                });
-                overlay.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') cancelBtn.click();
-                });
-                cancelBtn.focus();
-            });
-        };
-    </script>
+    <style>[v-cloak]{display:none}</style>
+    <script>window.UIINEED_LANG = 'zh';</script>
+    <script src="public/js/i18n.js"></script>
     <!-- Vue 2.x  Todo List   使用CDN就无需引入本地文件 -->
     <!-- <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script> -->
     <script src="public/js/vue.js"></script>
@@ -105,7 +30,7 @@
 <body>
     <div class="bg-pattern"></div>
     <div class="todo-wrapper">
-        <div id="todo-app" class="todo-app" >
+        <div id="todo-app" class="todo-app" v-cloak>
             <div class="container header ">
                 <div class="todo-input">
                     <h1 class="title">
@@ -132,12 +57,12 @@
                         </div>
                     </h1>
                     <div class="add-content-wrapper">
-                        <input type="text" rows="3" class="add-content" placeholder="新增待办事项..." v-model="newTodoTitle"
+                        <input type="text" rows="3" class="add-content" :placeholder="t.addPlaceholder" v-model="newTodoTitle"
                             @keyup.enter="addTodo" :class='{empty:emptyChecked}' />
                         <transition name="tips">
-                            <div class="tips" v-if='emptyChecked' style="color:red">💡请输入内容！</div>
+                            <div class="tips" v-if='emptyChecked' style="color:red">{{ t.enterContent }}</div>
                         </transition>
-                        <button class="btn submit-btn" type="button" @click="addTodo">提交</button>
+                        <button class="btn submit-btn" type="button" @click="addTodo">{{ t.addBtn }}</button>
                     </div>
 
                 </div>
@@ -145,7 +70,7 @@
             <div class="container main">
                 <div class="todo-list-box">
                     <div class="bar-message">
-                        <input type="button" class="btn btn-label btn-allFinish" value="全部标为完成"
+                        <input type="button" class="btn btn-label btn-allFinish" :value="t.markAllDone"
                             @click="markAllAsCompleted" v-if="todos.length || recycleBin.length" />
                         <template>
                             <div>
@@ -161,14 +86,7 @@
                     </div>
 
                     <ul v-if="!todos.length && showEmptyTips" class="empty-tips">
-                        <li> 添加你的第一个待办事项！📝</li>
-                        <li>食用方法💡：</li>
-                        <li>✔️ 所有提交操作支持Enter回车键提交</li>
-                        <li>✔️ 拖拽Todo上下移动可排序(仅支持PC)</li>
-                        <li>✔️ 双击上面的标语和 Todo 可进行编辑</li>
-                        <li>✔️ 右侧的小窗口是快捷操作哦</li>
-                        <li>🔒 所有的Todo数据存储在浏览器本地</li>
-                        <li>📝 支持下载和导入，导入追加到当前序列</li>
+                        <li v-for="(tip, i) in t.tipsList" :key="i">{{ tip }}</li>
                     </ul>
 
                     <transition-group name="drag" class="todo-list" tag="ul" mode="in-out" @before-enter="beforeEnter"
@@ -204,7 +122,7 @@
                             </div>
                             <!-- 编辑 -->
                             <div class="edit-todo-wrapper" v-if="editedTodo !== null && editedTodo.id === todo.id">
-                                <input type="text" class="edit-todo" value="编辑 Todo..."
+                                <input type="text" class="edit-todo" :placeholder="t.editPlaceholder"
                                     v-if="editedTodo !== null && editedTodo.id === todo.id" v-model="todo.title"
                                     v-focus="true" @keyup.enter="editDone(todo)" @keyup.esc="cancelEdit(todo)" @dragstart.stop.prevent @mousedown.stop />
                                 <div class="todo-btn btn-edit-submit"
@@ -216,8 +134,8 @@
                     </transition-group>
                     <div class="bar-message bar-bottom">
                         <div class="bar-message-text">
-                            <span v-if="leftTodosCount">剩余 {{leftTodosCount}} 项未完成</span>
-                            <span v-else-if="completedTodosCount">完美收工！</span>
+                            <span v-if="leftTodosCount">{{ tf('itemsRemaining', { n: leftTodosCount }) }}</span>
+                            <span v-else-if="completedTodosCount">{{ t.allCompleted }}</span>
                         </div>
                     </div>
                 </div>
@@ -226,7 +144,7 @@
                     <div class="side-shortcut" @click="shortCutAction()" :class="{fold: isShow}">
                         <div class="shortcut-switch">
                            <span class="shortcut-title">{{shortCut}}</span>
-                           <span class="shortcut-name">快捷操作 </span>
+                           <span class="shortcut-name">{{ t.quicks }} </span>
                         </div>
 
                     </div>
@@ -235,46 +153,81 @@
                             <!-- <li v-if="todos.length || recycleBin.length">筛选：</li> -->
                             <!-- <li v-if="hasRemovedTodo" ><input type="button" value="撤销" v-if="hasRemovedTodo" @click="restoreTodo()"></li> -->
                             <li > <input class="btn-small action-showAll"
-                                    type="button" value="全部" :class="{selected: intention === 'all'}"
+                                    type="button" :value="t.filterAll" :class="{selected: intention === 'all'}"
                                     @click="intention ='all'"></li>
                             <li v-if="completedTodosCount"><input class="btn-small action-progress" type="button"
-                                    value="进行中" v-if="leftTodosCount" :class="{selected: intention === 'ongoing'}"
+                                    :value="t.filterOngoing" v-if="leftTodosCount" :class="{selected: intention === 'ongoing'}"
                                     @click="intention ='ongoing'"></li>
                             <li v-if="completedTodosCount">
-                                <input class="btn-small action-completed" type="button" value="已完成"
+                                <input class="btn-small action-completed" type="button" :value="t.filterCompleted"
                                     v-if="completedTodosCount" :class="{selected: intention === 'completed'}"
                                     @click="intention='completed'">
                             </li>
                             <li v-if="recycleBin.length">
                                 <input class="btn-small action-deleted" type="button" v-if="recycleBin.length"
-                                    :class="{selected: intention === 'removed'}" value="回收站" @click="intention='removed'" />
+                                    :class="{selected: intention === 'removed'}" :value="t.filterTrash" @click="intention='removed'" />
                             </li>
                         </ul>
                         <ul class="todo-func-list batch">
                             <!-- <li v-if="todos.length">批量操作：</li> -->
                             <li v-if="leftTodosCount"> <input type="button" class="btn-small completed-all"
-                                    v-if="leftTodosCount" value="全部标为已完成" @click="markAllAsCompleted"> </li>
-                            <li v-if="completedTodosCount"> <input type="button" value="清除已完成"
+                                    v-if="leftTodosCount" :value="t.finishAll" @click="markAllAsCompleted"> </li>
+                            <li v-if="completedTodosCount"> <input type="button" :value="t.clearCompletedBtn"
                                     class="btn-small completed-clear" v-if="completedTodosCount" @click="clearCompleted">
                             </li>
-                            <li v-if="todos.length"><input type="button" class="btn-small clear-all" value="清除全部"
+                            <li v-if="todos.length"><input type="button" class="btn-small clear-all" :value="t.clearAllBtn"
                                     @click="clearAll"> </li>
+                            <li v-if="todos.length > 1"><input type="button" class="btn-small action-sort" :value="t.sortAZ"
+                                    @click="sortAZ"> </li>
                         </ul>
                         <ul class="todo-func-list datasave">
-                          <li v-if="leftTodosCount">
-                              <input type="button" value="导出数据"  class="btn-small  action-download" id="download" onclick="handleClickDownload()"></input>
+                           <li>
+                             <input type="button" :value="t.bulkAdd" class="btn-small action-bulk" @click="openBulk" />
                            </li>
                            <li>
-                             <input  value="导入(txt/json)" type="button" class="btn-small action-import" id="import" />
-                                <!-- <input type="file" id="import-file" accept=".txt,.json" style="display:none"> -->
-                          </li>
+                             <input type="button" :value="t.exportFile" class="btn-small action-download" @click="exportFile" />
+                           </li>
                            <li>
-                             <input type="button" value="刷新" class="btn-small action-reload" title="刷新页面（适用于添加到主屏幕的网页应用）" onclick="location.reload()" />
+                             <input type="button" :value="t.copyClipboard" class="btn-small action-copy" @click="copyToClipboard" />
+                           </li>
+                           <li>
+                             <input type="button" :value="t.importFile" class="btn-small action-import" @click="importFile" />
+                           </li>
+                           <li>
+                             <input type="button" :value="t.pasteClipboard" class="btn-small action-paste" @click="pasteFromClipboard" />
+                           </li>
+                           <li>
+                             <input type="button" :value="t.reload" class="btn-small action-reload" :title="t.reloadTitle" onclick="location.reload()" />
                           </li>
                         </ul>
 
                     </div>
 
+                </div>
+            </div>
+
+            <!-- 批量添加弹窗 -->
+            <div class="ui-modal-overlay" v-if="showBulk" @click.self="cancelBulk">
+                <div class="ui-modal">
+                    <div class="ui-modal-title">{{ t.bulkTitle }}</div>
+                    <div class="ui-modal-hint">{{ t.bulkHint }}</div>
+                    <textarea class="ui-modal-textarea" v-model="bulkText" :placeholder="t.bulkPlaceholder" rows="8"></textarea>
+                    <div class="ui-modal-buttons">
+                        <button class="custom-alert-btn cancel" @click="cancelBulk">{{ t.bulkCancel }}</button>
+                        <button class="custom-alert-btn confirm" @click="confirmBulk">{{ t.bulkConfirm }}</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 粘贴导入弹窗 -->
+            <div class="ui-modal-overlay" v-if="showPaste" @click.self="cancelPaste">
+                <div class="ui-modal">
+                    <div class="ui-modal-title">{{ t.pasteTitle }}</div>
+                    <div class="ui-modal-hint">{{ t.pasteHint }}</div>
+                    <textarea class="ui-modal-textarea" v-model="pasteText" rows="8"></textarea>
+                    <div class="ui-modal-buttons">
+                        <button class="custom-alert-btn cancel" @click="cancelPaste">{{ t.pasteCancel }}</button>
+                        <button class="custom-alert-btn confirm" @click="confirmPaste">{{ t.pasteConfirm }}</button>
+                    </div>
                 </div>
             </div>
 
@@ -344,416 +297,7 @@
         </div>
     </div>
 
-    <script>
-        // localStorage 存储数据
-        var STORAGE_KEY = 'uiineed-todos';
-        var RECYCLE_KEY = 'uiineed-recycle';
-        var FILTER_KEY = 'uiineed-filter';
-        var todoStorage = {
-            fetch: function () {
-                var todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-                todos.forEach(function (todo, index) {
-                    todo.id = index;
-                });
-                todoStorage.uid = todos.length;
-                return todos
-            },
-            save: function (todos) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
-            }
-        }
-        // 回收站持久化（刷新页面后回收站内容不丢失）
-        var recycleStorage = {
-            fetch: function () {
-                return JSON.parse(localStorage.getItem(RECYCLE_KEY) || '[]');
-            },
-            save: function (items) {
-                localStorage.setItem(RECYCLE_KEY, JSON.stringify(items))
-            }
-        }
-    </script>
-    <script>
-        var app = new Vue({
-            el: '#todo-app',
-            data: function () {
-                return {
-                    todos: todoStorage.fetch(),
-                    newTodoTitle: '',
-                    editedTodo: null,
-                    intention: localStorage.getItem(FILTER_KEY) || 'all', //恢复上次使用的筛选条件
-                    checkEmpty: false,
-                    recycleBin: recycleStorage.fetch(),
-                    dragIndex: '',
-                    enterIndex: '',
-                    show: true,
-                    delayTime: '1',
-                    isShow: false,
-                    shortCut:'开✨',
-                    popShow:true,
-                    windowWidth: document.documentElement.clientWidth,
-                    slogan: this.getSlogan(),
-                    isEditing: false,
-                    originalSlogan: ""
-                }
-            },
-            // 监测 todos 列表的变化，将变化存储到 local storage
-            watch: {
-                todos: {
-                    handler: function (todos) {
-                        todoStorage.save(todos)
-                    },
-                    deep: true
-                },
-                recycleBin: {
-                    handler: function (items) {
-                        recycleStorage.save(items)
-                    },
-                    deep: true
-                },
-                intention: function (val) {
-                    localStorage.setItem(FILTER_KEY, val)
-                }
-            },
-            methods: {
-                editText() {
-                    this.originalSlogan = this.slogan;
-                    this.isEditing = true;
-                    this.$nextTick(() => {
-                        this.$refs.sloganInput.focus();
-                    });
-                },
-                saveText() {
-                    this.isEditing = false;
-                    localStorage.setItem('uiineed-slogan', this.slogan);
-                },
-                cancelText() {
-                    this.slogan = this.originalSlogan;
-                    this.isEditing = false;
-                },
-                getSlogan() {
-                    return localStorage.getItem('uiineed-slogan') || "今日事今日毕，勿将今事待明日!.☕";
-                },
-                contorlScreen:function(){
-                    if(this.windowWidth < 768){
-                        this.isShow = !this.isShow;
-                        return this.shortCut = 'Filter'
-                    }
-                },
-                togglePop: function(){
-                    this.popShow = !this.popShow;//取反
-                },
-                shortCutAction: function(){
-                    this.isShow = !this.isShow;
-                    if(this.isShow){
-                        return this.shortCut = '关'
-                    }else{
-                        return this.shortCut = '开✨'
-                    }
-
-                },
-                shuffle: function () {
-                    this.filteredTodos = _.shuffle(this.filteredTodos);
-                },
-                addTodo: function (e) {
-                    if (this.newTodoTitle === '') {
-                        this.checkEmpty = true;
-                        return
-                    }else{
-                    }
-                    this.todos.unshift({
-                        id: todoStorage.uid++,
-                        title: this.newTodoTitle,
-                        completed: false,
-                        removed: false,
-                    });
-                    this.newTodoTitle = '';
-                    this.checkEmpty = false;
-                    this.delayTime = '0';
-
-
-                },
-                markAsCompleted: function (todo) {
-                    todo.completed = true;
-                },
-                markAsUncompleted: function (todo) {
-                    todo.completed = false
-                },
-                markAllAsCompleted: function () {
-                    confirm('确认一键勾选完成全部待办事项？').then((confirmed) => {
-                        if (confirmed) {
-                            this.todos.map(function (todo) {
-                                if (!todo.completed) todo.completed = true;
-                            })
-                        }
-                    }); 
-                },
-                removeTodo: function (todo) {
-                    let removedTodo = this.todos.splice(this.todos.indexOf(todo), 1)[0];
-                    removedTodo.removed = true;
-                    this.recycleBin.unshift(removedTodo);
-                    let pos = this.todos.indexOf(todo);
-                },
-                restoreTodo: function (todo) {
-                    todo.removed = false;
-                    this.todos.unshift(todo);
-                    let pos = this.recycleBin.indexOf(todo);
-                    this.recycleBin.splice(pos, 1);
-                },
-                editdTodo: function (todo) {
-                    this.editedTodo = {
-                        id: todo.id,
-                        title: todo.title
-                    }
-
-                },
-                lineFeed: function(event) {
-                    if (event.keyCode == 13 && event.ctrlKey ){
-                            this.newTodoTitle = this.newTodoTitle + '\n';
-                        } else {
-                            //event.preventDefault();
-                            if (this.newTodoTitle === '') {
-                                    this.checkEmpty = true;
-                                    return
-                                }else{
-                                }
-                                this.todos.unshift({
-                                    id: todoStorage.uid++,
-                                    title: this.newTodoTitle,
-                                    completed: false,
-                                    removed: false,
-                                });
-                                this.newTodoTitle = '';
-                                this.checkEmpty = false;
-                                this.delayTime = '0';
-
-                        }
-                    // this.newTodoTitle = this.newTodoTitle + '\n';
-                },
-                editDone: function (todo) {
-                    if (todo.title === '') {
-                        this.removeTodo(todo)
-                    }
-                    this.editedTodo = null;
-                },
-                cancelEdit: function (todo) {
-                    todo.title = this.editedTodo.title;
-                    this.editedTodo = null
-                },
-                clearCompleted: function () {
-                    confirm('确认清除全部已完成的代办事项?').then((confirmed) => {
-                        if (confirmed) {
-                            this.completedTodos.map(todo => todo.removed = true);
-                            this.recycleBin.unshift(...this.completedTodos);
-                            this.todos = this.leftTodos;
-                        }
-                    });
-                },
-                clearAll: function () {
-                    confirm('确认清除全部待办事项?').then((confirmed) => {
-                        if (confirmed) {
-                            this.todos.map(todo => todo.removed = true);
-                            this.recycleBin.unshift(...this.todos);
-                            this.todos = []
-                        }
-                    });
-                },
-                //拖拽 ------------------
-                dragstart: function (index) {
-                    this.dragIndex = index;
-                },
-                dragenter: function (e, index) {
-                    e.preventDefault();
-                    // 避免源对象触发自身的dragenter事件
-                    if (this.dragIndex !== index) {
-                        const source = this.filteredTodos[this.dragIndex];
-                        this.filteredTodos.splice(this.dragIndex, 1);
-                        this.filteredTodos.splice(index, 0, source);
-                        // 排序变化后目标对象的索引变成源对象的索引
-                        this.dragIndex = index;
-                    }
-                },
-                dragover: function (e, index) {
-                    e.preventDefault();
-                },
-                // JS钩子 加载动画
-                beforeEnter(dom) {
-                    dom.classList.add('drag-enter-active');
-                },
-                enter(dom, done) {
-                    let delay = dom.dataset.delay;
-                    setTimeout(() => {
-                        this.delayTime = '1';
-                        dom.classList.remove('drag-enter-active');
-                        dom.classList.add('drag-enter-to');
-                        let transitionend = window.ontransitionend ? "transitionend" :"webkitTransitionEnd";
-                        dom.addEventListener(transitionend, function onEnd() {
-                            dom.removeEventListener(transitionend, onEnd);
-                            done();
-                            //调用done() 告诉vue动画已完成，以触发 afterEnter 钩子
-                        })
-                    }, delay);
-                },
-                afterEnter(dom) {
-                    dom.classList.remove('drag-enter-to');
-                },
-                saveLanguage(lang) {
-                    localStorage.setItem('uiineed-todos-lang', lang);
-                }
-            },
-            mounted() {
-                this.show = true;
-                var that = this;
-                // 如果恢复的筛选条件没有内容可显示，则回退到“全部”
-                var counts = {
-                    ongoing: this.leftTodosCount,
-                    completed: this.completedTodosCount,
-                    removed: this.recycleBin.length
-                };
-                if (this.intention !== 'all' && !counts[this.intention]) {
-                    this.intention = 'all';
-                }
-                this.contorlScreen();
-                   // <!--把window.onresize事件挂在到mounted函数上-->
-                window.onresize = () => {
-                    return (() => {
-                    window.fullWidth = document.documentElement.clientWidth;
-                    that.windowWidth = window.fullWidth; // 宽
-                    })()
-                };
-            },
-            directives: {
-                focus: {
-                    inserted: function (el) {
-                        el.focus()
-                    }
-                }
-            },
-            computed: {
-                emptyChecked: function () {
-                    return this.newTodoTitle.length === 0 && this.checkEmpty
-                },
-                leftTodos: function () {
-                    return this.todos.filter(function (todo) {
-                        return !todo.completed
-                    })
-                },
-                leftTodosCount: function () {
-                    return this.leftTodos.length
-                },
-
-                hasRemovedTodo: function () {
-                    return !!this.removedTodo
-                },
-                completedTodos: function () {
-                    return this.todos.filter(function (todo) {
-                        return todo.completed
-                    })
-                },
-                completedTodosCount: function () {
-                    return this.completedTodos.length
-                },
-                filteredTodos: function () {
-                    if (this.intention === 'ongoing') {
-                        return this.leftTodos
-                    } else if (this.intention === 'completed') {
-                        return this.completedTodos
-                    } else if (this.intention === 'removed') {
-                        return this.recycleBin
-                    } else {
-                        return this.todos
-                    }
-                },
-                showEmptyTips() {
-                    return this.filteredTodos.length === 0 && this.intention !== 'removed';
-                },
-            },
-        })
-    </script>
-    <script>
-        // 调用 fetch 方法从 localStorage 获取数据
-        var fetchedTodos = todoStorage.fetch();
-        const handleClickDownload = () => {
-            const todosText = JSON.stringify(todoStorage.fetch(), null, 2);
-            const date = new Date().toISOString().replace(/-|:|\.\d+/g, '');
-            const fileName = `todos-${date.slice(0, 8)}-${date.slice(9, 15)}.txt`;
-            
-            const element = document.createElement('a');
-            element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(todosText);
-            element.download = fileName;
-            
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
-        };
-
-        // 导入文件
-        let tempFileInput = null; // 用于存储动态创建的文件输入元素
-        document.getElementById('import').addEventListener('click', function() {
-            if (!tempFileInput) {
-                // 如果不存在，则创建一个新的文件输入元素
-                tempFileInput = document.createElement('input');
-                tempFileInput.type = 'file';
-                tempFileInput.accept = '.txt,.json';
-                tempFileInput.style.display = 'none';
-                // 将新创建的文件输入元素添加到DOM中
-                // 这里选择添加到导入按钮的父元素内作为示例
-                this.parentNode.appendChild(tempFileInput);
-
-                // 为文件输入元素添加change事件监听器
-                tempFileInput.addEventListener('change', function(event) {
-                    var file = event.target.files[0];
-                    if (!file) return alert('没有选择文件！', '错误');
-                    var reader = new FileReader();
-                    reader.onload = function(e) {
-                        var content = e.target.result;
-                        try {
-                            var importedData;
-                            if (file.type === 'application/json') {
-                                // 如果是JSON文件，直接解析
-                                importedData = JSON.parse(content);
-
-                            } else if (file.type === 'text/plain') {
-                                // 如果是TXT文件，尝试将其解析为JSON（假设TXT文件内容格式正确）
-
-                                importedData = JSON.parse(content.trim());
-                            } else {
-                                throw new Error('不支持的文件类型');
-                            }
-                            // 从localStorage获取当前数据
-                            var currentTodos = todoStorage.fetch() || [];
-                            // 获取当前数据的数量，用于生成新的唯一id
-                            var nextIdIndex = currentTodos.length;
-                            // 遍历importedData，更新每一项的id
-                            importedData.forEach((item, index) => {
-                                item.id = nextIdIndex + index;
-                            });
-                            // 将新导入的数据追加到现有数据中
-                            var updatedTodos = currentTodos.concat(importedData);
-                            // 更新localStorage
-                            todoStorage.save(updatedTodos);
-                            // 更新页面内容
-                            updatePageContent(updatedTodos);
-                            alert('文件导入成功，数据已追加！');
-                        } catch (error) {
-                            alert('文件解析错误，请确保文件格式正确：' + error.message, '错误');
-                        }
-                    };
-                    reader.onerror = function(e) {
-                        alert('读取文件时发生错误：' + e.target.error.name, '错误');
-                    };
-                    reader.readAsText(file);
-                    this.parentNode.removeChild(tempFileInput);
-                     tempFileInput = null; // 重置变量以备后用
-                });
-            };
-            // 触发文件选择对话框
-            tempFileInput.click();
-        });
-        // 更新页面内容函数
-        function updatePageContent(data) {
-            app.todos = data;
-        }
-    </script>
+    <script src="public/js/app.js"></script>
 
 
 </body>

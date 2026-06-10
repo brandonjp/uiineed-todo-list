@@ -22,86 +22,18 @@
             const userLanguage = localStorage.getItem('uiineed-todos-lang');
             if (userLanguage && userLanguage === "zh") window.location.href = (window.location.pathname === "/") ? 'index-zh.html' : window.location.href.replace('index.html', 'index-zh.html');
         </script>
-        <script>
-            const nativeAlert = window.alert;
-            window.alert = function(message, title = 'Prompt') {
-                return new Promise((resolve) => {
-                    const overlay = document.createElement('div');
-                    overlay.className = 'custom-alert-overlay';
-                    const alertBox = document.createElement('div');
-                    alertBox.className = 'custom-alert';
-                    alertBox.innerHTML = `
-<div class="custom-alert-title">${title}</div>
-<div class="custom-alert-content">${message}</div>
-<div class="custom-alert-buttons">
-    <button class="custom-alert-btn confirm">OK</button>
-</div>
-                    `;
-                    overlay.appendChild(alertBox);
-                    document.body.appendChild(overlay);
-                    const confirmBtn = alertBox.querySelector('.confirm');
-                    confirmBtn.addEventListener('click', () => {
-                        alertBox.style.animation = 'popOut 0.3s forwards';
-                        setTimeout(() => {
-                            document.body.removeChild(overlay);
-                            resolve(true);
-                        }, 300);
-                    });
-                    overlay.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') confirmBtn.click();
-                    });
-                    confirmBtn.focus();
-                });
-            };
-            const nativeConfirm = window.alert;
-            window.confirm = function(message, title = 'Please Confirm') {
-                return new Promise((resolve) => {
-                    const overlay = document.createElement('div');
-                    overlay.className = 'custom-alert-overlay';
-                    const alertBox = document.createElement('div');
-                    alertBox.className = 'custom-alert';
-                    alertBox.innerHTML = `
-<div class="custom-alert-title">${title}</div>
-<div class="custom-alert-content">${message}</div>
-<div class="custom-alert-buttons">
-    <button class="custom-alert-btn cancel">Cancel</button>
-    <button class="custom-alert-btn confirm">OK</button>
-</div>
-                    `;
-                    overlay.appendChild(alertBox);
-                    document.body.appendChild(overlay);
-                    const confirmBtn = alertBox.querySelector('.confirm');
-                    const cancelBtn = alertBox.querySelector('.cancel');
-                    confirmBtn.addEventListener('click', () => {
-                        alertBox.style.animation = 'popOut 0.3s forwards';
-                        setTimeout(() => {
-                            document.body.removeChild(overlay);
-                            resolve(true);
-                        }, 300);
-                    });
-                    cancelBtn.addEventListener('click', () => {
-                        alertBox.style.animation = 'popOut 0.3s forwards';
-                        setTimeout(() => {
-                            document.body.removeChild(overlay);
-                            resolve(false);
-                        }, 300);
-                    });
-                    overlay.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') cancelBtn.click();
-                    });
-                    cancelBtn.focus();
-                });
-            };
-        </script>
+        <style>[v-cloak]{display:none}</style>
         <!-- Vue 2.x Todo List -->
         <!-- <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script> -->
+        <script>window.UIINEED_LANG = 'en';</script>
         <script src="public/js/vue.js"></script>
+        <script src="public/js/i18n.js"></script>
     </head>
 
     <body>
         <div class="bg-pattern"></div>
         <div class="todo-wrapper">
-            <div id="todo-app" class="todo-app">
+            <div id="todo-app" class="todo-app" v-cloak>
                 <div class="container header ">
                     <div class="todo-input">
                         <h1 class="title">
@@ -132,14 +64,14 @@
                                 type="text"
                                 rows="3"
                                 class="add-content"
-                                placeholder="Add a to-do item..."
+                                :placeholder="t.addPlaceholder"
                                 v-model="newTodoTitle"
                                 @keyup.enter="addTodo"
                                 :class='{empty:emptyChecked}'/>
                             <transition name="tips">
-                                <div class="tips" v-if='emptyChecked' style="color:red">💡Please enter content!</div>
+                                <div class="tips" v-if='emptyChecked' style="color:red">{{ t.enterContent }}</div>
                             </transition>
-                            <button class="btn submit-btn" type="button" @click="addTodo">Add</button>
+                            <button class="btn submit-btn" type="button" @click="addTodo">{{ t.addBtn }}</button>
                         </div>
 
                     </div>
@@ -152,7 +84,7 @@
                             <input
                                 type="button"
                                 class="btn btn-label btn-allFinish"
-                                value="Mark All Done"
+                                :value="t.markAllDone"
                                 @click="markAllAsCompleted"
                                 v-if="todos.length || recycleBin.length"/>
                             <template>
@@ -176,15 +108,7 @@
                         </div>
 
                         <ul v-if="!todos.length && showEmptyTips" class="empty-tips">
-                            <li>Add Your First To-Do Item! 📝</li>
-                            <li>Usage Tips 💡:</li>
-                            <li>✔️ Press Enter to submit actions.</li>
-                            <li>✔️ Drag to reorder your to-dos (PC only)</li>
-                            <li>✔️ Double-click to edit slogan and tasks.</li>
-                            <li>✔️ Access quick actions in the right sidebar.</li>
-                            <li>🔒 Your data is stored locally in your browser.</li>
-                            <li>📝 Supports data download and import.
-                            </li>
+                            <li v-for="(tip, i) in t.tipsList" :key="i">{{ tip }}</li>
                         </ul>
 
                         <transition-group
@@ -249,7 +173,7 @@
                                     <input
                                         type="text"
                                         class="edit-todo"
-                                        value="Edit Todo..."
+                                        :placeholder="t.editPlaceholder"
                                         v-if="editedTodo !== null && editedTodo.id === todo.id"
                                         v-model="todo.title"
                                         v-focus="true"
@@ -267,8 +191,8 @@
                         </transition-group>
                         <div class="bar-message bar-bottom">
                             <div class="bar-message-text">
-                                <span v-if="leftTodosCount">{{leftTodosCount}} items remaining</span>
-                                <span v-else-if="completedTodosCount">All completed, good job!</span>
+                                <span v-if="leftTodosCount">{{ tf('itemsRemaining', { n: leftTodosCount }) }}</span>
+                                <span v-else-if="completedTodosCount">{{ t.allCompleted }}</span>
                             </div>
                         </div>
                     </div>
@@ -277,7 +201,7 @@
                         <div class="side-shortcut" @click="shortCutAction()" :class="{fold: isShow}">
                             <div class="shortcut-switch">
                                 <span class="shortcut-title">{{shortCut}}</span>
-                                <span class="shortcut-name">Quicks
+                                <span class="shortcut-name">{{ t.quicks }}
                                 </span>
                             </div>
 
@@ -291,13 +215,13 @@
                                     <input
                                         class="btn-small action-showAll"
                                         type="button"
-                                        value="All"
+                                        :value="t.filterAll"
                                         :class="{selected: intention === 'all'}"
                                         @click="intention ='all'"></li>
                                 <li v-if="completedTodosCount"><input
                                     class="btn-small action-progress"
                                     type="button"
-                                    value="In Progress"
+                                    :value="t.filterOngoing"
                                     v-if="leftTodosCount"
                                     :class="{selected: intention === 'ongoing'}"
                                     @click="intention ='ongoing'"></li>
@@ -305,7 +229,7 @@
                                     <input
                                         class="btn-small action-completed"
                                         type="button"
-                                        value="Completed"
+                                        :value="t.filterCompleted"
                                         v-if="completedTodosCount"
                                         :class="{selected: intention === 'completed'}"
                                         @click="intention='completed'">
@@ -316,7 +240,7 @@
                                         type="button"
                                         v-if="recycleBin.length"
                                         :class="{selected: intention === 'removed'}"
-                                        value="Trash"
+                                        :value="t.filterTrash"
                                         @click="intention='removed'"/>
                                 </li>
                             </ul>
@@ -327,13 +251,13 @@
                                         type="button"
                                         class="btn-small completed-all"
                                         v-if="leftTodosCount"
-                                        value="Finish all"
+                                        :value="t.finishAll"
                                         @click="markAllAsCompleted">
                                 </li>
                                 <li v-if="completedTodosCount">
                                     <input
                                         type="button"
-                                        value="Clear Completed"
+                                        :value="t.clearCompletedBtn"
                                         class="btn-small completed-clear"
                                         v-if="completedTodosCount"
                                         @click="clearCompleted">
@@ -341,40 +265,89 @@
                                 <li v-if="todos.length"><input
                                     type="button"
                                     class="btn-small clear-all"
-                                    value="Clear All"
+                                    :value="t.clearAllBtn"
                                     @click="clearAll">
+                                </li>
+                                <li v-if="todos.length > 1"><input
+                                    type="button"
+                                    class="btn-small action-sort"
+                                    :value="t.sortAZ"
+                                    @click="sortAZ">
                                 </li>
                             </ul>
                             <ul class="todo-func-list datasave">
-                                <li v-if="leftTodosCount">
+                                <li>
                                     <input
                                         type="button"
-                                        value="Export data"
-                                        class="btn-small  action-download"
-                                        id="download"
-                                        onclick="handleClickDownload()"></input>
+                                        :value="t.bulkAdd"
+                                        class="btn-small action-bulk"
+                                        @click="openBulk"/>
                                 </li>
                                 <li>
                                     <input
-                                        value="Import(txt/json)"
                                         type="button"
+                                        :value="t.exportFile"
+                                        class="btn-small action-download"
+                                        @click="exportFile"/>
+                                </li>
+                                <li>
+                                    <input
+                                        type="button"
+                                        :value="t.copyClipboard"
+                                        class="btn-small action-copy"
+                                        @click="copyToClipboard"/>
+                                </li>
+                                <li>
+                                    <input
+                                        type="button"
+                                        :value="t.importFile"
                                         class="btn-small action-import"
-                                        id="import"/>
-                                    <!-- <input type="file" id="import-file" accept=".txt,.json"
-                                    style="display:none"> -->
+                                        @click="importFile"/>
                                 </li>
                                 <li>
                                     <input
                                         type="button"
-                                        value="Reload"
+                                        :value="t.pasteClipboard"
+                                        class="btn-small action-paste"
+                                        @click="pasteFromClipboard"/>
+                                </li>
+                                <li>
+                                    <input
+                                        type="button"
+                                        :value="t.reload"
                                         class="btn-small action-reload"
-                                        title="Reload the page (useful for Home Screen web apps)"
+                                        :title="t.reloadTitle"
                                         onclick="location.reload()"/>
                                 </li>
                             </ul>
 
                         </div>
 
+                    </div>
+                </div>
+
+                <!-- Bulk add modal -->
+                <div class="ui-modal-overlay" v-if="showBulk" @click.self="cancelBulk">
+                    <div class="ui-modal">
+                        <div class="ui-modal-title">{{ t.bulkTitle }}</div>
+                        <div class="ui-modal-hint">{{ t.bulkHint }}</div>
+                        <textarea class="ui-modal-textarea" v-model="bulkText" :placeholder="t.bulkPlaceholder" rows="8"></textarea>
+                        <div class="ui-modal-buttons">
+                            <button class="custom-alert-btn cancel" @click="cancelBulk">{{ t.bulkCancel }}</button>
+                            <button class="custom-alert-btn confirm" @click="confirmBulk">{{ t.bulkConfirm }}</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Paste-import fallback modal -->
+                <div class="ui-modal-overlay" v-if="showPaste" @click.self="cancelPaste">
+                    <div class="ui-modal">
+                        <div class="ui-modal-title">{{ t.pasteTitle }}</div>
+                        <div class="ui-modal-hint">{{ t.pasteHint }}</div>
+                        <textarea class="ui-modal-textarea" v-model="pasteText" rows="8"></textarea>
+                        <div class="ui-modal-buttons">
+                            <button class="custom-alert-btn cancel" @click="cancelPaste">{{ t.pasteCancel }}</button>
+                            <button class="custom-alert-btn confirm" @click="confirmPaste">{{ t.pasteConfirm }}</button>
+                        </div>
                     </div>
                 </div>
 
@@ -445,407 +418,7 @@
 
             </div>
         </div>
-        <script>
-            // localStorage operations
-            var STORAGE_KEY = 'uiineed-todos';
-            var RECYCLE_KEY = 'uiineed-recycle';
-            var FILTER_KEY = 'uiineed-filter';
-            var todoStorage = {
-                fetch: function() {
-                    var todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-                    todos.forEach(function(todo, index) {
-                        todo.id = index;
-                    });
-                    todoStorage.uid = todos.length;
-                    return todos;
-                },
-                save: function(todos) {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
-                }
-            }
-            // Recycle bin persistence (so the Trash survives a page refresh)
-            var recycleStorage = {
-                fetch: function() {
-                    return JSON.parse(localStorage.getItem(RECYCLE_KEY) || '[]');
-                },
-                save: function(items) {
-                    localStorage.setItem(RECYCLE_KEY, JSON.stringify(items));
-                }
-            }
-        </script>
-        <script>
-            // Vue instance initialization
-            var app = new Vue({
-                el: '#todo-app',
-                data: function() {
-                    return {
-                        todos: todoStorage.fetch(),
-                        newTodoTitle: '',
-                        editedTodo: null,
-                        intention: localStorage.getItem(FILTER_KEY) || 'all', // restore last-used filter
-                        checkEmpty: false,
-                        recycleBin: recycleStorage.fetch(),
-                        dragIndex: '',
-                        enterIndex: '',
-                        show: true,
-                        delayTime: '1',
-                        isShow: false,
-                        shortCut: 'OPEN✨',
-                        popShow: true,
-                        windowWidth: document.documentElement.clientWidth,
-                        slogan: this.getSlogan(),
-                        isEditing: false,
-                        originalSlogan: ""
-                    };
-                },
-                watch: {
-                    todos: {
-                        handler: function(todos) {
-                            todoStorage.save(todos);
-                        },
-                        deep: true
-                    },
-                    recycleBin: {
-                        handler: function(items) {
-                            recycleStorage.save(items);
-                        },
-                        deep: true
-                    },
-                    intention: function(val) {
-                        localStorage.setItem(FILTER_KEY, val);
-                    }
-                },
-                methods: {
-                    editText() {
-                        this.originalSlogan = this.slogan;
-                        this.isEditing = true;
-                        this.$nextTick(() => {
-                            this.$refs.sloganInput.focus();
-                        });
-                    },
-                    saveText() {
-                        this.isEditing = false;
-                        localStorage.setItem('uiineed-slogan', this.slogan);
-                    },
-                    cancelText() {
-                        this.slogan = this.originalSlogan;
-                        this.isEditing = false;
-                    },
-                    getSlogan() {
-                        return localStorage.getItem('uiineed-slogan') || "Act Now, Simplify Life.☕";
-                    },
-                    contorlScreen: function() {
-                        if (this.windowWidth < 768) {
-                            this.isShow = !this.isShow;
-                            return this.shortCut = 'Filter';
-                        }
-                    },
-                    togglePop: function() {
-                        this.popShow = !this.popShow;
-                    },
-                    shortCutAction: function() {
-                        this.isShow = !this.isShow;
-                        if (this.isShow) {
-                            return this.shortCut = '＝';
-                        } else {
-                            return this.shortCut = 'OPEN✨';
-                        }
-                    },
-                    shuffle: function() {
-                        this.filteredTodos = _.shuffle(this.filteredTodos);
-                    },
-                    addTodo: function(e) {
-                        if (this.newTodoTitle === '') {
-                            this.checkEmpty = true;
-                            return;
-                        }
-                        this.todos.unshift({
-                            id: todoStorage.uid++,
-                            title: this.newTodoTitle,
-                            completed: false,
-                            removed: false
-                        });
-                        this.newTodoTitle = '';
-                        this.checkEmpty = false;
-                        this.delayTime = '0';
-                    },
-                    markAsCompleted: function(todo) {
-                        todo.completed = true;
-                    },
-                    markAsUncompleted: function(todo) {
-                        todo.completed = false;
-                    },
-                    markAllAsCompleted: function() {
-                        confirm('Confirm to mark all as completed?').then((confirmed) => {
-                            if (confirmed) {
-                                this.todos.map(function(todo) {
-                                    if (!todo.completed) todo.completed = true;
-                                });
-                            }
-                        }); 
-                    },
-
-                    removeTodo: function(todo) {
-                        let removedTodo = this.todos.splice(this.todos.indexOf(todo), 1)[0];
-                        removedTodo.removed = true;
-                        this.recycleBin.unshift(removedTodo);
-                    },
-                    restoreTodo: function(todo) {
-                        todo.removed = false;
-                        this.todos.unshift(todo);
-                        let pos = this.recycleBin.indexOf(todo);
-                        this.recycleBin.splice(pos, 1);
-                    },
-                    editdTodo: function(todo) {
-                        this.editedTodo = {
-                            id: todo.id,
-                            title: todo.title
-                        }
-                    },
-                    lineFeed: function(event) {
-                        if (event.keyCode == 13 && event.ctrlKey) {
-                            this.newTodoTitle = this.newTodoTitle + '\n';
-                        } else {
-                            if (this.newTodoTitle === '') {
-                                this.checkEmpty = true;
-                                return;
-                            }
-                            this.todos.unshift({
-                                id: todoStorage.uid++,
-                                title: this.newTodoTitle,
-                                completed: false,
-                                removed: false
-                            });
-                            this.newTodoTitle = '';
-                            this.checkEmpty = false;
-                            this.delayTime = '0';
-                        }
-                    },
-                    editDone: function(todo) {
-                        if (todo.title === '') {
-                            this.removeTodo(todo);
-                        }
-                        this.editedTodo = null;
-                    },
-                    cancelEdit: function(todo) {
-                        todo.title = this.editedTodo.title;
-                        this.editedTodo = null;
-                    },
-                    clearCompleted: function() {
-                        confirm('Confirm to clear all completed items?').then((confirmed) => {
-                            if (confirmed) {
-                                this.completedTodos.map(todo => todo.removed = true);
-                                this.recycleBin.unshift(...this.completedTodos);
-                                this.todos = this.leftTodos;
-                            }
-                        });
-                    },
-                    clearAll: function() {
-                        confirm('Confirm to clear all todo items?').then((confirmed) => {
-                            if (confirmed) {
-                                this.todos.map(todo => todo.removed = true);
-                                this.recycleBin.unshift(...this.todos);
-                                this.todos = [];
-                            }
-                        });
-                    },
-
-                    // Drag Operations
-                    dragstart: function(index) {
-                        this.dragIndex = index;
-                    },
-                    dragenter: function(e, index) {
-                        e.preventDefault();
-                        // Avoid source object triggering its own dragenter event
-                        if (this.dragIndex !== index) {
-                            const source = this.filteredTodos[this.dragIndex];
-                            this.filteredTodos.splice(this.dragIndex, 1);
-                            this.filteredTodos.splice(index, 0, source);
-                            // After reordering, target index becomes source index
-                            this.dragIndex = index;
-                        }
-                    },
-                    dragover: function(e, index) {
-                        e.preventDefault();
-                    },
-                    // JS hooks for animation
-                    beforeEnter(dom) {
-                        dom.classList.add('drag-enter-active');
-                    },
-                    enter(dom, done) {
-                        let delay = dom.dataset.delay;
-                        setTimeout(() => {
-                            this.delayTime = '1';
-                            dom.classList.remove('drag-enter-active');
-                            dom.classList.add('drag-enter-to');
-                            let transitionend = window.ontransitionend
-                                ? "transitionend"
-                                : "webkitTransitionEnd";
-                            dom.addEventListener(transitionend, function onEnd() {
-                                dom.removeEventListener(transitionend, onEnd);
-                                done();
-                                // Call done() to tell Vue animation is complete, triggering afterEnter hook
-                            })
-                        }, delay);
-                    },
-                    afterEnter(dom) {
-                        dom.classList.remove('drag-enter-to');
-                    },
-                    saveLanguage(lang) {
-                        localStorage.setItem('uiineed-todos-lang', lang);
-                    }
-                },
-
-                mounted() {
-                    this.show = true;
-                    var that = this;
-                    // If the restored filter has no items to show, fall back to "all"
-                    var counts = {
-                        ongoing: this.leftTodosCount,
-                        completed: this.completedTodosCount,
-                        removed: this.recycleBin.length
-                    };
-                    if (this.intention !== 'all' && !counts[this.intention]) {
-                        this.intention = 'all';
-                    }
-                    this.contorlScreen();
-                    // Attach window.onresize event to mounted function
-                    window.onresize = () => {
-                        return (() => {
-                            window.fullWidth = document.documentElement.clientWidth;
-                            that.windowWidth = window.fullWidth; // width
-                        })()
-                    };
-                },
-
-                directives: {
-                    focus: {
-                        inserted: function(el) {
-                            el.focus()
-                        }
-                    }
-                },
-
-                computed: {
-                    emptyChecked: function() {
-                        return this.newTodoTitle.length === 0 && this.checkEmpty
-                    },
-                    leftTodos: function() {
-                        return this.todos.filter(function(todo) {
-                            return !todo.completed
-                        })
-                    },
-                    leftTodosCount: function() {
-                        return this.leftTodos.length
-                    },
-                    hasRemovedTodo: function() {
-                        return !!this.removedTodo
-                    },
-                    completedTodos: function() {
-                        return this.todos.filter(function(todo) {
-                            return todo.completed
-                        })
-                    },
-                    completedTodosCount: function() {
-                        return this.completedTodos.length
-                    },
-                    filteredTodos: function() {
-                        if (this.intention === 'ongoing') {
-                            return this.leftTodos
-                        } else if (this.intention === 'completed') {
-                            return this.completedTodos
-                        } else if (this.intention === 'removed') {
-                            return this.recycleBin
-                        } else {
-                            return this.todos
-                        }
-                    },
-                    showEmptyTips() {
-                        return this.filteredTodos.length === 0 && this.intention !== 'removed';
-                    }
-                }
-                })
-        </script>
-        <script>
-            // Fetch data from localStorage
-            var fetchedTodos = todoStorage.fetch();
-
-            const handleClickDownload = () => {
-                const todosText = JSON.stringify(todoStorage.fetch(), null, 2);
-                const date = new Date().toISOString().replace(/-|:|\.\d+/g, '');
-                const fileName = `todos-${date.slice(0, 8)}-${date.slice(9, 15)}.txt`;
-                
-                const element = document.createElement('a');
-                element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(todosText);
-                element.download = fileName;
-                
-                document.body.appendChild(element);
-                element.click();
-                document.body.removeChild(element);
-            };
-
-            // Import file
-            let tempFileInput = null; // Store dynamically created file input element
-            document.getElementById('import').addEventListener('click', function() {
-                if (!tempFileInput) {
-                    tempFileInput = document.createElement('input');
-                    tempFileInput.type = 'file';
-                    tempFileInput.accept = '.txt,.json';
-                    tempFileInput.style.display = 'none';
-                    this.parentNode.appendChild(tempFileInput);
-
-                    tempFileInput.addEventListener('change', function(event) {
-                        var file = event.target.files[0];
-                        if (!file) return alert('No file selected!', 'Error');
-                        var reader = new FileReader();
-                        reader.onload = function(e) {
-                            var content = e.target.result;
-                            try {
-                                var importedData;
-                                if (file.type === 'application/json') {
-                                    // If JSON file, parse directly
-                                    importedData = JSON.parse(content);
-                                } else if (file.type === 'text/plain') {
-                                    // If TXT file, try to parse as JSON
-                                    importedData = JSON.parse(content.trim());
-                                } else {
-                                    throw new Error('Unsupported file type');
-                                }
-                                // Get current data from localStorage
-                                var currentTodos = todoStorage.fetch() || [];
-                                // Get current data count for new unique ids
-                                var nextIdIndex = currentTodos.length;
-                                // Update ids for imported data
-                                importedData.forEach((item, index) => {
-                                    item.id = nextIdIndex + index;
-                                });
-                                // Append imported data to existing data
-                                var updatedTodos = currentTodos.concat(importedData);
-                                // Update localStorage
-                                todoStorage.save(updatedTodos);
-                                // Update page content
-                                updatePageContent(updatedTodos);
-                                alert('File imported successfully, data has been appended!');
-                            } catch (error) {
-                                alert('File parsing error, please ensure correct format: ' + error.message, 'Error');
-                            }
-                        };
-                        reader.onerror = function(e) {
-                            alert('Error reading file: ' + e.target.error.name, 'Error');
-                        };
-                        reader.readAsText(file);
-                        this.parentNode.removeChild(tempFileInput);
-                        tempFileInput = null;
-                    });
-                }
-                tempFileInput.click();
-            });
-
-            function updatePageContent(data) {
-                app.todos = data;
-            }
-
-        </script>
+        <script src="public/js/app.js"></script>
     </body>
 
 </html>
