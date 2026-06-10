@@ -238,23 +238,42 @@ shared-code refactor before the big features so we only build them once.
    removed ZH-only debug `console.log` + dead commented code; removed the empty `windowWidth`
    watcher. _(BUG-2 stable IDs and BUG-3/SEC-1 hardening intentionally deferred to Phase 1.)_
 
-### Phase 1 — Foundation refactor (do before big features)
-6. **TECH-DEBT-1** Extract shared `app.js` + i18n string maps; dedupe EN/ZH. _(medium, unlocks everything)_
-7. **BUG-2** Stable unique IDs. _(small, but touch it during the refactor)_
-8. **SEC-1 / BUG-3** Harden alert (`textContent`) and import parser. _(small–medium)_
+### Phase 1 — Foundation refactor — ✅ DONE
+6. ✅ **TECH-DEBT-1** Extracted all logic into `public/js/app.js` and strings into
+   `public/js/i18n.js`; both HTML files load the shared modules and bind UI text via i18n
+   (each keeps its own intentionally-different About section). `v-cloak` prevents template flash.
+7. ✅ **BUG-2** Stable, unique, persisted ids (`genId`); ids are de-collided/migrated on load.
+8. ✅ **SEC-1 / BUG-3** Dialogs now set text via `textContent` (no `innerHTML`); import parser
+   accepts JSON array / `{todos:[]}` / string array / newline text, with validation.
 
-### Phase 2 — High-value features
-9. **IO-1…IO-6** Clipboard export/import + bulk entry + hardened parser + **dedupe-on-import**.
-   _(medium; this IS the supported sync path — file/clipboard via iCloud/Dropbox)_
-10. **THM-1 / THM-2 / SET-1** Settings panel + theme engine + 5 themes. _(medium; mostly CSS)_
-11. **QOL-2** Auto-sort/alphabetize toggle. _(small)_
+### Phase 2 — High-value features — ✅ DONE
+9. ✅ **IO-1…IO-6** Copy-to-clipboard + paste-from-clipboard (with textarea fallback modal),
+   bulk-add modal, hardened parser, and **dedupe on import/bulk** (by stable id, then
+   normalized title+state) reporting added/updated/skipped. Export is now a full JSON backup.
+   _This is the supported cross-device sync path — file/clipboard via iCloud/Dropbox._
+10. ✅ **THM / SET** Settings panel + theme engine + 5 new themes (Dark, Sepia, Ocean,
+    High Contrast, Pastel) + Auto (prefers-color-scheme). Persisted to `uiineed-settings`.
+11. ✅ **QOL-2** One-shot alphabetical sort button.
 
-### Phase 3 — Larger
-12. **MOB-1** Touch drag-to-reorder (+ fix TECH-DEBT-2) and **MOB-2…MOB-5** mobile polish. _(medium–large; headline mobile item)_
+### Phase 3 — Mobile
+12. ✅ **MOB-1** Touch drag-to-reorder (long-press to pick up, then drag; quick swipe still
+    scrolls). Shared `moveItem` helper now backs both desktop DnD and touch, fixing
+    **TECH-DEBT-2** (reorder no longer mutates a filtered computed; guarded to the "all" view).
+    _Reorder logic verified headlessly; the touch gesture itself needs on-device verification._
+13. ⬜ **MOB-2…MOB-5** Remaining mobile polish — tap-target sizing, sidebar affordance,
+    `inputmode`/`enterkeyhint`, safe-area insets, and a PWA manifest (pairs with QOL-4 reload
+    button for Home-Screen web-app use). _Not yet done._
 
 ### Future / not scheduled
 - **Sync Option A** (hosted Cloudflare Worker + KV "Sync ID"). Documented in Section 3 as a
   possible later upgrade if manual file/clipboard sync proves tedious. Not built now.
+
+### ⚠️ Verification status
+All JavaScript was validated by a **headless jsdom mount harness** that boots both pages,
+checks initial load / id-migration / filter-restore, and exercises add, sort, reorder,
+import+dedupe, bulk-add, and the theme engine (no template/render errors, no mustache leak).
+What still needs a **real browser / device**: visual look of the 5 themes (esp. Dark icon
+inversion), the touch long-press gesture feel, and clipboard permission prompts on iOS Safari.
 
 ### Effort/impact summary
 
