@@ -20,6 +20,36 @@
     var RECYCLE_KEY = 'uiineed-recycle';
     var FILTER_KEY = 'uiineed-filter';
     var SLOGAN_KEY = 'uiineed-slogan';
+    var SETTINGS_KEY = 'uiineed-settings';
+
+    // ---- Settings + theme ---------------------------------------------------
+    var THEMES = ['classic', 'dark', 'sepia', 'ocean', 'contrast', 'pastel', 'auto'];
+
+    function loadSettings() {
+        try {
+            var s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+            return { theme: THEMES.indexOf(s.theme) >= 0 ? s.theme : 'classic' };
+        } catch (e) {
+            return { theme: 'classic' };
+        }
+    }
+
+    function effectiveTheme(theme) {
+        if (theme === 'auto') {
+            var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            return dark ? 'dark' : 'classic';
+        }
+        return theme;
+    }
+
+    function applyTheme(theme) {
+        var resolved = effectiveTheme(theme);
+        if (resolved === 'classic') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            document.documentElement.setAttribute('data-theme', resolved);
+        }
+    }
 
     // ---- Stable unique IDs (BUG-2) -----------------------------------------
     // IDs are generated once at creation and persisted, so they stay stable
@@ -208,6 +238,8 @@
 
     // ---- Vue instance -------------------------------------------------------
     var initial = loadState();
+    var settings = loadSettings();
+    applyTheme(settings.theme); // apply before mount to avoid a flash
 
     var app = new Vue({
         el: '#todo-app',
@@ -234,7 +266,10 @@
                 showBulk: false,
                 bulkText: '',
                 showPaste: false,
-                pasteText: ''
+                pasteText: '',
+                showSettings: false,
+                theme: settings.theme,
+                themeList: THEMES
             };
         },
         watch: {
@@ -246,7 +281,11 @@
                 handler: function (items) { recycleStorage.save(items); },
                 deep: true
             },
-            intention: function (val) { localStorage.setItem(FILTER_KEY, val); }
+            intention: function (val) { localStorage.setItem(FILTER_KEY, val); },
+            theme: function (val) {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: val }));
+                applyTheme(val);
+            }
         },
         computed: {
             t: function () { return I18N[this.lang] || I18N.en || {}; },
@@ -269,6 +308,15 @@
             },
             showEmptyTips: function () {
                 return this.filteredTodos.length === 0 && this.intention !== 'removed';
+            },
+            themeOptions: function () {
+                var t = this.t;
+                var labels = {
+                    classic: t.themeClassic, dark: t.themeDark, sepia: t.themeSepia,
+                    ocean: t.themeOcean, contrast: t.themeContrast, pastel: t.themePastel,
+                    auto: t.themeAuto
+                };
+                return this.themeList.map(function (name) { return { value: name, label: labels[name] || name }; });
             }
         },
         methods: {
@@ -505,7 +553,12 @@
             },
             afterEnter: function (dom) { dom.classList.remove('drag-enter-to'); },
 
-            saveLanguage: function (lang) { localStorage.setItem('uiineed-todos-lang', lang); }
+            saveLanguage: function (lang) { localStorage.setItem('uiineed-todos-lang', lang); },
+
+            // Settings panel
+            openSettings: function () { this.showSettings = true; },
+            closeSettings: function () { this.showSettings = false; },
+            setTheme: function (name) { this.theme = name; }
         },
         directives: {
             focus: {

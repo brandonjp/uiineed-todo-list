@@ -182,6 +182,9 @@
                         </ul>
                         <ul class="todo-func-list datasave">
                            <li>
+                             <input type="button" :value="t.settings" class="btn-small action-settings" @click="openSettings" />
+                           </li>
+                           <li>
                              <input type="button" :value="t.bulkAdd" class="btn-small action-bulk" @click="openBulk" />
                            </li>
                            <li>
@@ -227,6 +230,26 @@
                     <div class="ui-modal-buttons">
                         <button class="custom-alert-btn cancel" @click="cancelPaste">{{ t.pasteCancel }}</button>
                         <button class="custom-alert-btn confirm" @click="confirmPaste">{{ t.pasteConfirm }}</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 设置弹窗 -->
+            <div class="ui-modal-overlay" v-if="showSettings" @click.self="closeSettings">
+                <div class="ui-modal">
+                    <div class="ui-modal-title">{{ t.settingsTitle }}</div>
+                    <div class="settings-row">
+                        <div class="settings-label">{{ t.themeLabel }}</div>
+                        <div class="theme-options">
+                            <button
+                                v-for="opt in themeOptions"
+                                :key="opt.value"
+                                class="theme-chip"
+                                :class="{selected: theme === opt.value}"
+                                @click="setTheme(opt.value)">{{ opt.label }}</button>
+                        </div>
+                    </div>
+                    <div class="ui-modal-buttons">
+                        <button class="custom-alert-btn confirm" @click="closeSettings">{{ t.settingsClose }}</button>
                     </div>
                 </div>
             </div>

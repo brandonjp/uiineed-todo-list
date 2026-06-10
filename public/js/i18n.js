@@ -89,6 +89,19 @@ window.I18N = {
         clipboardReadError: "Couldn't read the clipboard. Paste your data manually instead.",
         nothingToExport: 'There is nothing to export yet.',
 
+        // Settings + themes
+        settings: 'Settings',
+        settingsTitle: 'Settings',
+        themeLabel: 'Theme',
+        themeClassic: 'Classic',
+        themeDark: 'Dark',
+        themeSepia: 'Sepia',
+        themeOcean: 'Ocean',
+        themeContrast: 'High Contrast',
+        themePastel: 'Pastel',
+        themeAuto: 'Auto (system)',
+        settingsClose: 'Done',
+
         defaultSlogan: 'Act Now, Simplify Life.☕'
     },
 
@@ -171,6 +184,19 @@ window.I18N = {
         clipboardCopyError: '无法访问剪贴板，请改用“导出文件”。',
         clipboardReadError: '无法读取剪贴板，请手动粘贴数据。',
         nothingToExport: '暂时没有可导出的内容。',
+
+        // Settings + themes
+        settings: '设置',
+        settingsTitle: '设置',
+        themeLabel: '主题',
+        themeClassic: '经典',
+        themeDark: '深色',
+        themeSepia: '复古棕',
+        themeOcean: '海洋',
+        themeContrast: '高对比',
+        themePastel: '柔和',
+        themeAuto: '跟随系统',
+        settingsClose: '完成',
 
         defaultSlogan: '立即行动，简化生活。☕'
     }
