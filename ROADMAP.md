@@ -227,12 +227,16 @@ across devices, so there is no zero-server native path. Not viable.
 Ordered by **value ÷ effort**, front-loading quick wins and the audit fixes, and doing the
 shared-code refactor before the big features so we only build them once.
 
-### Phase 0 — Quick wins & safety (hours, low risk)
-1. **QOL-3** Hide delete-X while editing. _(tiny, high UX)_
-2. **QOL-1** Persist last-used filter. _(tiny)_
-3. **QOL-4** Reload button (+ basic PWA manifest meta). _(tiny)_
-4. **BUG-1** Persist recycle bin. _(small, fixes data loss)_
-5. **BUG-4 / BUG-5 / SEC-3** Prune dead code, add `rel="noopener"`. _(tiny cleanup)_
+### Phase 0 — Quick wins & safety (hours, low risk) — ✅ DONE
+1. ✅ **QOL-3** Hide delete-X while the item's inline editor is open. _(tiny, high UX)_
+2. ✅ **QOL-1** Persist last-used filter (`uiineed-filter`), with a fallback to "all" if the
+   restored filter has no items.
+3. ✅ **QOL-4** Reload button in the sidebar (`location.reload()`). _(PWA manifest meta still
+   pending — fold into MOB-5.)_
+4. ✅ **BUG-1** Persist recycle bin to `uiineed-recycle` (survives refresh).
+5. ✅ **SEC-3 / cleanup** Added `rel="noopener noreferrer"` to all `target="_blank"` links;
+   removed ZH-only debug `console.log` + dead commented code; removed the empty `windowWidth`
+   watcher. _(BUG-2 stable IDs and BUG-3/SEC-1 hardening intentionally deferred to Phase 1.)_
 
 ### Phase 1 — Foundation refactor (do before big features)
 6. **TECH-DEBT-1** Extract shared `app.js` + i18n string maps; dedupe EN/ZH. _(medium, unlocks everything)_
@@ -292,8 +296,17 @@ shared-code refactor before the big features so we only build them once.
 
 This is the plan for **TECH-DEBT-1**. Today, `index.html` (English) and `index-zh.html`
 (Chinese) are two near-complete copies — the markup, the Vue logic, the import/export scripts,
-the empty-state tips — all duplicated, with only the visible text differing. Every behavior
-change has to be made in both files, and the two have already drifted.
+the empty-state tips — all duplicated, with only the visible text differing.
+
+**How much have they actually diverged?** Verified by diffing the two files: the **feature
+set, method names, data, and computeds are identical**. The only behavioral divergence was
+leftover debug/dead code in the ZH file — a `console.log("实时屏幕宽度…")` in its
+`windowWidth` watcher, plus a block of commented-out dead code (`logAllIds`, stale
+`app.todos.push`) in `updatePageContent` — none of which existed in EN. (Both were removed in
+Phase 0.) Beyond that, the files differ only in **formatting** (`function ()` vs `function()`,
+indentation depth). So the case for dedupe is **not** "they've forked into different apps" —
+it's that every future change must be made twice, and the formatting gap makes it hard to
+verify by diff that the two stayed in sync.
 
 ### How translation will work
 

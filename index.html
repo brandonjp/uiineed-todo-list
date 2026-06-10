@@ -236,7 +236,7 @@
                                 </div>
                                 <div
                                     class="todo-btn btn-delete"
-                                    v-else="todo.removed"
+                                    v-if="!todo.removed && !(editedTodo !== null && editedTodo.id === todo.id)"
                                     @click="removeTodo(todo)">
                                     <img
                                         src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xNS4wOTkzIDE3Ljc1OTdDMTUuNzk0OSAxOC4yMDk4IDE2LjcyMzUgMTguMDEwOCAxNy4xNzM2IDE3LjMxNTJDMTcuNjIzNiAxNi42MTk3IDE3LjQyNDYgMTUuNjkxMSAxNi43MjkxIDE1LjI0MUMxMy4zMDc5IDEzLjAyNzMgMTAuODIwOSAxMC45OTU5IDguOTIyNTEgOS4wMzczOUM5LjA5NzQyIDguODQ5ODIgOS4yNzI5MSA4LjY2NTcxIDkuNDQ4ODggOC40ODUzNEMxMS44ODY0IDUuOTg2OTIgMTQuMjQ3MiA0LjM4MDY2IDE2LjI5NDQgMy45NzEyMkMxNy4xMDY3IDMuODA4NzUgMTcuNjMzNSAzLjAxODUyIDE3LjQ3MTEgMi4yMDYxOEMxNy4zMDg2IDEuMzkzODQgMTYuNTE4NCAwLjg2NzAxMyAxNS43MDYgMS4wMjk0OEMxMi43NTMyIDEuNjIwMDUgOS44NjQwNiAzLjc2Mzc5IDcuMzAxNTQgNi4zOTAzN0M3LjE4MTUxIDYuNTEzNCA3LjA2MTgxIDYuNjM3ODkgNi45NDI0OSA2Ljc2Mzc1QzUuNDIwMDEgNC44MDQzMyA0LjM3MDU4IDIuODc2MzIgMy40MjU5MSAwLjg2MzE2NEMzLjA3Mzk5IDAuMTEzMjAyIDIuMTgwNzMgLTAuMjA5NDc1IDEuNDMwNzcgMC4xNDI0NDVDMC42ODA4MDkgMC40OTQzNjUgMC4zNTgxMzIgMS4zODc2MiAwLjcxMDA1MSAyLjEzNzU4QzEuODIwODggNC41MDQ4MSAzLjA3ODk5IDYuNzY1MTEgNC45MjkzMiA5LjA1MzA2QzMuMjIyMDYgMTEuMTM0MSAxLjYyNjY5IDEzLjQzMjggMC4yMjI3MjMgMTUuNzE0MkMtMC4yMTE0NTMgMTYuNDE5NyAwLjAwODUyNzUyIDE3LjM0MzcgMC43MTQwNjQgMTcuNzc3OEMxLjQxOTYgMTguMjEyIDIuMzQzNTIgMTcuOTkyIDIuNzc3NyAxNy4yODY1QzQuMDQ4MTkgMTUuMjIyIDUuNDY0MDUgMTMuMTcyNiA2Ljk1NTU5IDExLjMxNjhDOC45ODUgMTMuMzc2NSAxMS41OTU5IDE1LjQ5MjggMTUuMDk5MyAxNy43NTk3WiIgZmlsbD0iIzMzMzIyRSIvPgo8L3N2Zz4K"
@@ -363,6 +363,14 @@
                                     <!-- <input type="file" id="import-file" accept=".txt,.json"
                                     style="display:none"> -->
                                 </li>
+                                <li>
+                                    <input
+                                        type="button"
+                                        value="Reload"
+                                        class="btn-small action-reload"
+                                        title="Reload the page (useful for Home Screen web apps)"
+                                        onclick="location.reload()"/>
+                                </li>
                             </ul>
 
                         </div>
@@ -373,7 +381,7 @@
                 <!-- Custom Info -->
                 <div class="nav">
                     <div class="github">
-                        <a href="https://github.com/ricocc/uiineed-todo-list?ref=opensource-todo" target="_blank" class="social-link" draggable="false">
+                        <a href="https://github.com/ricocc/uiineed-todo-list?ref=opensource-todo" target="_blank" rel="noopener noreferrer" class="social-link" draggable="false">
                             <img src="public/img/social/github.svg" class="ic-social" alt="" draggable="false">
                         </a>
                     </div>
@@ -396,10 +404,10 @@
                                     </div>
                                 </div>
                                 <div class="social">
-                                    <a href="https://x.com/ricouii" target="_blank" class="social-link">
+                                    <a href="https://x.com/ricouii" target="_blank" rel="noopener noreferrer" class="social-link">
                                         <img src="public/img/social/x.svg" class="ic-social" alt="">
                                     </a>
-                                    <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" class="social-link" draggable="false">
+                                    <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" rel="noopener noreferrer" class="social-link" draggable="false">
                                         <img src="public/img/social/github.svg" class="ic-social" alt="" draggable="false">
                                     </a>
                                     <a href="mailto:ricocc@qq.com" class="social-link">
@@ -407,21 +415,21 @@
                                     </a>
                                     <a
                                         href="https://www.xiaohongshu.com/user/profile/5f2b6903000000000101f51f"
-                                        target="_blank"
+                                        target="_blank" rel="noopener noreferrer"
                                         class="social-link">
                                         <img src="public/img/social/xiaohongshu.svg" class="ic-social" alt="">
                                     </a>
 
                                     <a
                                         href="https://dribbble.com/rrrricocc"
-                                        target="_blank"
+                                        target="_blank" rel="noopener noreferrer"
                                         class="social-link">
                                         <img src="public/img/social/dribbble.svg" class="ic-social" alt="">
                                     </a>
 
                                 </div>
 
-                                <a href="https://ricoui.com/?ref=todo" target="_blank" class="inspiration">🔖Rico's Blog↗
+                                <a href="https://ricoui.com/?ref=todo" target="_blank" rel="noopener noreferrer" class="inspiration">🔖Rico's Blog↗
                                 </a>
                             </div>
                         </div>
@@ -440,6 +448,8 @@
         <script>
             // localStorage operations
             var STORAGE_KEY = 'uiineed-todos';
+            var RECYCLE_KEY = 'uiineed-recycle';
+            var FILTER_KEY = 'uiineed-filter';
             var todoStorage = {
                 fetch: function() {
                     var todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -453,6 +463,15 @@
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
                 }
             }
+            // Recycle bin persistence (so the Trash survives a page refresh)
+            var recycleStorage = {
+                fetch: function() {
+                    return JSON.parse(localStorage.getItem(RECYCLE_KEY) || '[]');
+                },
+                save: function(items) {
+                    localStorage.setItem(RECYCLE_KEY, JSON.stringify(items));
+                }
+            }
         </script>
         <script>
             // Vue instance initialization
@@ -463,9 +482,9 @@
                         todos: todoStorage.fetch(),
                         newTodoTitle: '',
                         editedTodo: null,
-                        intention: 'all', // Default: all
+                        intention: localStorage.getItem(FILTER_KEY) || 'all', // restore last-used filter
                         checkEmpty: false,
-                        recycleBin: [],
+                        recycleBin: recycleStorage.fetch(),
                         dragIndex: '',
                         enterIndex: '',
                         show: true,
@@ -480,14 +499,20 @@
                     };
                 },
                 watch: {
-                    windowWidth(val) {
-                        let that = this;
-                    },
                     todos: {
                         handler: function(todos) {
                             todoStorage.save(todos);
                         },
                         deep: true
+                    },
+                    recycleBin: {
+                        handler: function(items) {
+                            recycleStorage.save(items);
+                        },
+                        deep: true
+                    },
+                    intention: function(val) {
+                        localStorage.setItem(FILTER_KEY, val);
                     }
                 },
                 methods: {
@@ -674,6 +699,15 @@
                 mounted() {
                     this.show = true;
                     var that = this;
+                    // If the restored filter has no items to show, fall back to "all"
+                    var counts = {
+                        ongoing: this.leftTodosCount,
+                        completed: this.completedTodosCount,
+                        removed: this.recycleBin.length
+                    };
+                    if (this.intention !== 'all' && !counts[this.intention]) {
+                        this.intention = 'all';
+                    }
                     this.contorlScreen();
                     // Attach window.onresize event to mounted function
                     window.onresize = () => {

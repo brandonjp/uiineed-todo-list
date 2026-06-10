@@ -198,7 +198,7 @@
                                 alt="还原" draggable="false">
                             </div>
                             <!-- 删除 -->
-                            <div class="todo-btn btn-delete" v-else="todo.removed" @click="removeTodo(todo)">
+                            <div class="todo-btn btn-delete" v-if="!todo.removed && !(editedTodo !== null && editedTodo.id === todo.id)" @click="removeTodo(todo)">
                                 <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xNS4wOTkzIDE3Ljc1OTdDMTUuNzk0OSAxOC4yMDk4IDE2LjcyMzUgMTguMDEwOCAxNy4xNzM2IDE3LjMxNTJDMTcuNjIzNiAxNi42MTk3IDE3LjQyNDYgMTUuNjkxMSAxNi43MjkxIDE1LjI0MUMxMy4zMDc5IDEzLjAyNzMgMTAuODIwOSAxMC45OTU5IDguOTIyNTEgOS4wMzczOUM5LjA5NzQyIDguODQ5ODIgOS4yNzI5MSA4LjY2NTcxIDkuNDQ4ODggOC40ODUzNEMxMS44ODY0IDUuOTg2OTIgMTQuMjQ3MiA0LjM4MDY2IDE2LjI5NDQgMy45NzEyMkMxNy4xMDY3IDMuODA4NzUgMTcuNjMzNSAzLjAxODUyIDE3LjQ3MTEgMi4yMDYxOEMxNy4zMDg2IDEuMzkzODQgMTYuNTE4NCAwLjg2NzAxMyAxNS43MDYgMS4wMjk0OEMxMi43NTMyIDEuNjIwMDUgOS44NjQwNiAzLjc2Mzc5IDcuMzAxNTQgNi4zOTAzN0M3LjE4MTUxIDYuNTEzNCA3LjA2MTgxIDYuNjM3ODkgNi45NDI0OSA2Ljc2Mzc1QzUuNDIwMDEgNC44MDQzMyA0LjM3MDU4IDIuODc2MzIgMy40MjU5MSAwLjg2MzE2NEMzLjA3Mzk5IDAuMTEzMjAyIDIuMTgwNzMgLTAuMjA5NDc1IDEuNDMwNzcgMC4xNDI0NDVDMC42ODA4MDkgMC40OTQzNjUgMC4zNTgxMzIgMS4zODc2MiAwLjcxMDA1MSAyLjEzNzU4QzEuODIwODggNC41MDQ4MSAzLjA3ODk5IDYuNzY1MTEgNC45MjkzMiA5LjA1MzA2QzMuMjIyMDYgMTEuMTM0MSAxLjYyNjY5IDEzLjQzMjggMC4yMjI3MjMgMTUuNzE0MkMtMC4yMTE0NTMgMTYuNDE5NyAwLjAwODUyNzUyIDE3LjM0MzcgMC43MTQwNjQgMTcuNzc3OEMxLjQxOTYgMTguMjEyIDIuMzQzNTIgMTcuOTkyIDIuNzc3NyAxNy4yODY1QzQuMDQ4MTkgMTUuMjIyIDUuNDY0MDUgMTMuMTcyNiA2Ljk1NTU5IDExLjMxNjhDOC45ODUgMTMuMzc2NSAxMS41OTU5IDE1LjQ5MjggMTUuMDk5MyAxNy43NTk3WiIgZmlsbD0iIzMzMzIyRSIvPgo8L3N2Zz4K"
                                 alt="删除" draggable="false">
                             </div>
@@ -268,6 +268,9 @@
                              <input  value="导入(txt/json)" type="button" class="btn-small action-import" id="import" />
                                 <!-- <input type="file" id="import-file" accept=".txt,.json" style="display:none"> -->
                           </li>
+                           <li>
+                             <input type="button" value="刷新" class="btn-small action-reload" title="刷新页面（适用于添加到主屏幕的网页应用）" onclick="location.reload()" />
+                          </li>
                         </ul>
 
                     </div>
@@ -278,7 +281,7 @@
              <!-- 自定义个人的信息 -->
             <div class="nav" draggable="false">
                 <div class="github">
-                    <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" class="social-link" draggable="false">
+                    <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" rel="noopener noreferrer" class="social-link" draggable="false">
                         <img src="public/img/social/github.svg" class="ic-social" alt="" draggable="false">
                     </a>
                 </div>
@@ -288,7 +291,7 @@
                         作者
                         </div>
                         <div class="popup animated popIn" v-if="!popShow">
-                            <a href="https://ricoui.com/?ref=todo" class="author" target="_blank" style="text-decoration: none;">
+                            <a href="https://ricoui.com/?ref=todo" class="author" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
                                 <img src="public/img/author.jpg" alt="">
                                 Rico的设计漫想
                             </a>
@@ -299,29 +302,29 @@
                             </div>
 
                             <div class="social">
-                                <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" class="social-link" draggable="false">
+                                <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" rel="noopener noreferrer" class="social-link" draggable="false">
                                     <img src="public/img/social/github.svg" class="ic-social" alt="" draggable="false">
                                 </a>
 
-                                <a href="https://www.xiaohongshu.com/user/profile/5f2b6903000000000101f51f" target="_blank" class="social-link">
+                                <a href="https://www.xiaohongshu.com/user/profile/5f2b6903000000000101f51f" target="_blank" rel="noopener noreferrer" class="social-link">
                                     <img src="public/img/social/xiaohongshu.svg" class="ic-social" alt="">
                                 </a>
-                                <a href="https://x.com/ricouii" target="_blank" class="social-link">
+                                <a href="https://x.com/ricouii" target="_blank" rel="noopener noreferrer" class="social-link">
                                     <img src="public/img/social/x.svg" class="ic-social" alt="">
                                 </a>
-                                <!-- <a href="https://space.bilibili.com/11442751?ref=opensource-todo" target="_blank" class="social-link">
+                                <!-- <a href="https://space.bilibili.com/11442751?ref=opensource-todo" target="_blank" rel="noopener noreferrer" class="social-link">
                                     <img src="public/img/social/bilibili.svg" class="ic-social" alt="">
                                 </a> -->
-                                <a href="https://www.zcool.com.cn/u/13170647" target="_blank" class="social-link">
+                                <a href="https://www.zcool.com.cn/u/13170647" target="_blank" rel="noopener noreferrer" class="social-link">
                                     <img src="public/img/social/zcool.svg" class="ic-social" alt="">
                                 </a>
                                 <a href="mailto:ricocc@qq.com" class="social-link">
                                     <img src="public/img/social/mail.svg" class="ic-social" alt="">
                                 </a>
                             </div>
-                            <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" class="inspiration">⭐<small>200+</small> Todo开源地址 
+                            <a href="https://github.com/ricocc/uiineed-todo-list" target="_blank" rel="noopener noreferrer" class="inspiration">⭐<small>200+</small> Todo开源地址 
                             </a>
-                            <a href="https://ricoui.com/?ref=todo" target="_blank" class="inspiration">⭐<small>180+</small> 个人网站↗
+                            <a href="https://ricoui.com/?ref=todo" target="_blank" rel="noopener noreferrer" class="inspiration">⭐<small>180+</small> 个人网站↗
                             </a>
                             <div class="zanshan">
                                 <p>有问题可以添加微信☕</p>
@@ -344,6 +347,8 @@
     <script>
         // localStorage 存储数据
         var STORAGE_KEY = 'uiineed-todos';
+        var RECYCLE_KEY = 'uiineed-recycle';
+        var FILTER_KEY = 'uiineed-filter';
         var todoStorage = {
             fetch: function () {
                 var todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -357,6 +362,15 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
             }
         }
+        // 回收站持久化（刷新页面后回收站内容不丢失）
+        var recycleStorage = {
+            fetch: function () {
+                return JSON.parse(localStorage.getItem(RECYCLE_KEY) || '[]');
+            },
+            save: function (items) {
+                localStorage.setItem(RECYCLE_KEY, JSON.stringify(items))
+            }
+        }
     </script>
     <script>
         var app = new Vue({
@@ -366,9 +380,9 @@
                     todos: todoStorage.fetch(),
                     newTodoTitle: '',
                     editedTodo: null,
-                    intention: 'all', //默认为 all
+                    intention: localStorage.getItem(FILTER_KEY) || 'all', //恢复上次使用的筛选条件
                     checkEmpty: false,
-                    recycleBin: [],
+                    recycleBin: recycleStorage.fetch(),
                     dragIndex: '',
                     enterIndex: '',
                     show: true,
@@ -384,15 +398,20 @@
             },
             // 监测 todos 列表的变化，将变化存储到 local storage
             watch: {
-                windowWidth (val) {
-                    let that = this;
-                    console.log("实时屏幕宽度：",val);
-                },
                 todos: {
                     handler: function (todos) {
                         todoStorage.save(todos)
                     },
                     deep: true
+                },
+                recycleBin: {
+                    handler: function (items) {
+                        recycleStorage.save(items)
+                    },
+                    deep: true
+                },
+                intention: function (val) {
+                    localStorage.setItem(FILTER_KEY, val)
                 }
             },
             methods: {
@@ -584,6 +603,15 @@
             mounted() {
                 this.show = true;
                 var that = this;
+                // 如果恢复的筛选条件没有内容可显示，则回退到“全部”
+                var counts = {
+                    ongoing: this.leftTodosCount,
+                    completed: this.completedTodosCount,
+                    removed: this.recycleBin.length
+                };
+                if (this.intention !== 'all' && !counts[this.intention]) {
+                    this.intention = 'all';
+                }
                 this.contorlScreen();
                    // <!--把window.onresize事件挂在到mounted函数上-->
                 window.onresize = () => {
@@ -644,8 +672,6 @@
     <script>
         // 调用 fetch 方法从 localStorage 获取数据
         var fetchedTodos = todoStorage.fetch();
-        // 在控制台打印获取到的数据
-        // console.log("Stored Todos:", fetchedTodos);
         const handleClickDownload = () => {
             const todosText = JSON.stringify(todoStorage.fetch(), null, 2);
             const date = new Date().toISOString().replace(/-|:|\.\d+/g, '');
@@ -725,14 +751,7 @@
         });
         // 更新页面内容函数
         function updatePageContent(data) {
-            // app.todos.push(data);
             app.todos = data;
-            // function logAllIds(data) {
-            //     data.forEach(item => {
-            //         console.log("更新的数据ID:", item.id);
-            //     });
-            // }
-            // logAllIds(data);
         }
     </script>
 
