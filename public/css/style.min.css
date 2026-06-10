@@ -32,3 +32,7 @@
 [data-theme="dark"] .btn-edit-submit img,
 [data-theme="dark"] .slogan-btn img,
 [data-theme="dark"] .title-1 { filter: invert(0.92); }
+
+/* Touch long-press drag feedback */
+.todo-item.touch-dragging .todo-content { box-shadow: var(--box-shadow); transform: scale(1.02); opacity: 0.92; }
+.todo-item.touch-dragging { z-index: 5; }

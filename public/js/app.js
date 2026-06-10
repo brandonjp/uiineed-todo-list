@@ -269,7 +269,11 @@
                 pasteText: '',
                 showSettings: false,
                 theme: settings.theme,
-                themeList: THEMES
+                themeList: THEMES,
+                touchDragging: false,
+                touchTimer: null,
+                touchStartX: 0,
+                touchStartY: 0
             };
         },
         watch: {
@@ -522,18 +526,69 @@
                 alert(this.tf('bulkSummary', res));
             },
 
-            // Drag reorder (desktop pointer/HTML5 DnD; touch handled in a later pass)
+            // Shared reorder used by both desktop drag-and-drop and touch drag.
+            // Reordering only makes sense on the unfiltered "all" view.
+            moveItem: function (from, to) {
+                if (this.intention !== 'all') return;
+                if (from == null || to == null || from === to) return;
+                var src = this.todos[from];
+                if (!src) return;
+                this.todos.splice(from, 1);
+                this.todos.splice(to, 0, src);
+            },
+
+            // Desktop HTML5 drag-and-drop
             dragstart: function (index) { this.dragIndex = index; },
             dragenter: function (e, index) {
                 e.preventDefault();
-                if (this.dragIndex !== index && this.intention === 'all') {
-                    var source = this.todos[this.dragIndex];
-                    this.todos.splice(this.dragIndex, 1);
-                    this.todos.splice(index, 0, source);
+                if (this.dragIndex !== index) {
+                    this.moveItem(this.dragIndex, index);
                     this.dragIndex = index;
                 }
             },
             dragover: function (e) { e.preventDefault(); },
+
+            // Touch drag (mobile): long-press to pick up, then drag to reorder.
+            // Long-press avoids fighting with normal list scrolling — a quick
+            // swipe scrolls; holding still for ~280ms starts a drag.
+            touchStartItem: function (index, e) {
+                if (this.intention !== 'all') return;
+                var touch = e.touches && e.touches[0];
+                if (!touch) return;
+                this.dragIndex = index;
+                this.touchStartX = touch.clientX;
+                this.touchStartY = touch.clientY;
+                var self = this;
+                clearTimeout(this.touchTimer);
+                this.touchTimer = setTimeout(function () { self.touchDragging = true; }, 280);
+            },
+            touchMoveItem: function (e) {
+                var touch = e.touches && e.touches[0];
+                if (!touch) return;
+                if (!this.touchDragging) {
+                    // Still deciding: a real move before long-press fires means
+                    // the user is scrolling, so cancel the pending pick-up.
+                    var dx = Math.abs(touch.clientX - this.touchStartX);
+                    var dy = Math.abs(touch.clientY - this.touchStartY);
+                    if (dx > 10 || dy > 10) { clearTimeout(this.touchTimer); this.touchTimer = null; }
+                    return; // allow native scrolling
+                }
+                e.preventDefault(); // we own the gesture now
+                var el = document.elementFromPoint(touch.clientX, touch.clientY);
+                while (el && !(el.classList && el.classList.contains('todo-item'))) el = el.parentElement;
+                if (!el) return;
+                var idx = parseInt(el.getAttribute('data-index'), 10);
+                if (!isNaN(idx) && idx !== this.dragIndex) {
+                    this.moveItem(this.dragIndex, idx);
+                    this.dragIndex = idx;
+                }
+            },
+            touchEndItem: function () {
+                clearTimeout(this.touchTimer);
+                this.touchTimer = null;
+                this.touchDragging = false;
+                this.dragIndex = '';
+            },
 
             // transition-group JS animation hooks
             beforeEnter: function (dom) { dom.classList.add('drag-enter-active'); },

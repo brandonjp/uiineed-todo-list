@@ -126,9 +126,15 @@
                                 v-for='(todo, index) in filteredTodos'
                                 :key='todo.id'
                                 class='todo-item'
+                                :class="{ 'touch-dragging': touchDragging && dragIndex === index }"
+                                :data-index="index"
                                 @dragenter="dragenter($event, index)"
                                 @dragover="dragover($event, index)"
                                 @dragstart="dragstart(index)"
+                                @touchstart="touchStartItem(index, $event)"
+                                @touchmove="touchMoveItem($event)"
+                                @touchend="touchEndItem"
+                                @touchcancel="touchEndItem"
                                 :data-delay="index * 150 * delayTime"
                                 v-show="show"
                                 :draggable="!(editedTodo !== null && editedTodo.id === todo.id)">
