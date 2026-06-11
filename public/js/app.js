@@ -7,12 +7,20 @@
  *
  * Templates stay in each HTML file (their author/About sections differ on purpose),
  * but all user-facing text is pulled from i18n.js via the `t` / `tf` helpers.
+ *
+ * The pure data helpers (parse/merge/dedupe/normalize) are also exported under
+ * Node (see the "Node test hook" below) so test/logic.test.js can exercise the
+ * real code with no browser. In a browser that hook is skipped — behavior there
+ * is unchanged.
  */
 (function () {
     'use strict';
 
-    var ACTIVE_LANG = (window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
-    var I18N = window.I18N || {};
+    var APP_VERSION = '1.1.0';
+
+    var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
+    var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
+    var I18N = (typeof window !== 'undefined' && window.I18N) || {};
     var L = I18N[ACTIVE_LANG] || I18N.en || {};
 
     // ---- Storage keys -------------------------------------------------------
@@ -97,11 +105,18 @@
         return { todos: todos, recycle: recycle };
     }
 
+    // Writes that tolerate storage being full or disabled (e.g. Safari private
+    // mode) without throwing inside a Vue watcher and breaking reactivity.
+    function safeSet(key, value) {
+        try { localStorage.setItem(key, value); return true; }
+        catch (e) { return false; }
+    }
+
     var todoStorage = {
-        save: function (todos) { localStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); }
+        save: function (todos) { safeSet(STORAGE_KEY, JSON.stringify(todos)); }
     };
     var recycleStorage = {
-        save: function (items) { localStorage.setItem(RECYCLE_KEY, JSON.stringify(items)); }
+        save: function (items) { safeSet(RECYCLE_KEY, JSON.stringify(items)); }
     };
 
     // ---- Custom dialogs (SEC-1: text set via textContent, never innerHTML) --
@@ -153,6 +168,24 @@
         });
     }
 
+    // ---- Node test hook -----------------------------------------------------
+    // When loaded under Node (no DOM), export the pure helpers for the test
+    // harness and stop before the browser bootstrap. In a browser `module` is
+    // undefined, so this whole block is skipped and behavior is unchanged.
+    // (The exported functions are hoisted declarations defined further below.)
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            APP_VERSION: APP_VERSION,
+            coerce: coerce,
+            parseImport: parseImport,
+            parseRecycle: parseRecycle,
+            normKey: normKey,
+            mergeImport: mergeImport,
+            genId: genId
+        };
+        return;
+    }
+
     window.alert = function (message, title) {
         return buildDialog(message, {
             title: title || L.dialogPromptTitle,
@@ -200,6 +233,22 @@
         return out;
     }
 
+    // Extract the recycle-bin array from a full backup object (IO-5), so
+    // importing an export restores trashed items too. Plain todo lists and
+    // newline text have no recycle bin -> returns [].
+    function parseRecycle(content) {
+        if (content == null) return [];
+        var data;
+        try { data = JSON.parse(String(content).trim()); } catch (e) { return []; }
+        if (!data || !Array.isArray(data.recycleBin)) return [];
+        var out = [];
+        data.recycleBin.forEach(function (it) {
+            var c = coerce(it);
+            if (c.title && c.title.trim()) out.push(c);
+        });
+        return out;
+    }
+
     function normKey(t) {
         return (t.title || '').trim().toLowerCase().replace(/\s+/g, ' ') + '|' + (t.completed ? '1' : '0');
     }
@@ -227,7 +276,10 @@
                 return;
             }
             if (byKey[normKey(inc)]) { skipped++; return; }
-            var nt = { id: genId(), title: inc.title, completed: inc.completed, removed: false };
+            // Preserve a non-colliding incoming id so stable ids propagate across
+            // devices (later re-imports then match by id, not just by title).
+            var newId = (inc.id != null && !byId[inc.id]) ? inc.id : genId();
+            var nt = { id: newId, title: inc.title, completed: inc.completed, removed: false };
             targetList.unshift(nt);
             byId[nt.id] = nt;
             byKey[normKey(nt)] = nt;
@@ -251,7 +303,7 @@
                 intention: localStorage.getItem(FILTER_KEY) || 'all', // restore last-used filter
                 checkEmpty: false,
                 recycleBin: initial.recycle,
-                dragIndex: '',
+                dragIndex: null,
                 enterIndex: '',
                 show: true,
                 delayTime: '1',
@@ -285,9 +337,9 @@
                 handler: function (items) { recycleStorage.save(items); },
                 deep: true
             },
-            intention: function (val) { localStorage.setItem(FILTER_KEY, val); },
+            intention: function (val) { safeSet(FILTER_KEY, val); },
             theme: function (val) {
-                localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: val }));
+                safeSet(SETTINGS_KEY, JSON.stringify({ theme: val }));
                 applyTheme(val);
             }
         },
@@ -340,7 +392,7 @@
             },
             saveText: function () {
                 this.isEditing = false;
-                localStorage.setItem(SLOGAN_KEY, this.slogan);
+                safeSet(SLOGAN_KEY, this.slogan);
             },
             cancelText: function () {
                 this.slogan = this.originalSlogan;
@@ -379,14 +431,17 @@
 
             // Remove / restore
             removeTodo: function (todo) {
-                var removedTodo = this.todos.splice(this.todos.indexOf(todo), 1)[0];
+                var idx = this.todos.indexOf(todo);
+                if (idx === -1) return; // not in the active list (e.g. an edited trashed item)
+                var removedTodo = this.todos.splice(idx, 1)[0];
                 removedTodo.removed = true;
                 this.recycleBin.unshift(removedTodo);
             },
             restoreTodo: function (todo) {
+                var pos = this.recycleBin.indexOf(todo);
+                if (pos === -1) return; // guard against splice(-1) deleting the wrong item
                 todo.removed = false;
                 this.todos.unshift(todo);
-                var pos = this.recycleBin.indexOf(todo);
                 this.recycleBin.splice(pos, 1);
             },
 
@@ -471,8 +526,13 @@
             applyImport: function (content) {
                 var parsed = parseImport(content);
                 if (parsed === null) { alert(this.t.importParseError, this.t.errorTitle); return false; }
-                if (!parsed.length) { alert(this.t.importEmpty); return false; }
+                var recycled = parseRecycle(content); // restore trashed items from a full backup
+                if (!parsed.length && !recycled.length) { alert(this.t.importEmpty); return false; }
                 var res = mergeImport(this.todos, parsed);
+                if (recycled.length) {
+                    mergeImport(this.recycleBin, recycled);
+                    this.recycleBin.forEach(function (t) { t.removed = true; });
+                }
                 alert(this.tf('importSummary', res));
                 return true;
             },
@@ -480,9 +540,12 @@
                 var self = this;
                 var input = document.createElement('input');
                 input.type = 'file';
-                input.accept = '.txt,.json';
+                input.accept = '.txt,.json,application/json,text/plain';
                 input.style.display = 'none';
                 input.addEventListener('change', function (event) {
+                    // Remove only after the picker has resolved — removing it
+                    // synchronously after click() cancels the picker on iOS Safari.
+                    if (input.parentNode) input.parentNode.removeChild(input);
                     var file = event.target.files[0];
                     if (!file) return;
                     var reader = new FileReader();
@@ -494,7 +557,6 @@
                 });
                 document.body.appendChild(input);
                 input.click();
-                document.body.removeChild(input);
             },
             pasteFromClipboard: function () {
                 var self = this;
@@ -587,28 +649,34 @@
                 clearTimeout(this.touchTimer);
                 this.touchTimer = null;
                 this.touchDragging = false;
-                this.dragIndex = '';
+                this.dragIndex = null;
             },
 
             // transition-group JS animation hooks
             beforeEnter: function (dom) { dom.classList.add('drag-enter-active'); },
             enter: function (dom, done) {
                 var self = this;
-                var delay = dom.dataset.delay;
+                var delay = parseInt(dom.dataset.delay, 10) || 0;
                 setTimeout(function () {
                     self.delayTime = '1';
                     dom.classList.remove('drag-enter-active');
                     dom.classList.add('drag-enter-to');
                     var transitionend = window.ontransitionend ? 'transitionend' : 'webkitTransitionEnd';
-                    dom.addEventListener(transitionend, function onEnd() {
-                        dom.removeEventListener(transitionend, onEnd);
+                    var finished = false;
+                    function finish() {
+                        if (finished) return;
+                        finished = true;
+                        dom.removeEventListener(transitionend, finish);
                         done();
-                    });
+                    }
+                    dom.addEventListener(transitionend, finish);
+                    // Fallback: if no transition runs (reduced motion, 0 delay), don't hang the item.
+                    setTimeout(finish, 600);
                 }, delay);
             },
             afterEnter: function (dom) { dom.classList.remove('drag-enter-to'); },
 
-            saveLanguage: function (lang) { localStorage.setItem('uiineed-todos-lang', lang); },
+            saveLanguage: function (lang) { safeSet('uiineed-todos-lang', lang); },
 
             // Settings panel
             openSettings: function () { this.showSettings = true; },
@@ -639,4 +707,13 @@
     });
 
     window.app = app;
+    window.UIINEED_VERSION = APP_VERSION;
+
+    // Keep the 'auto' theme in sync with live OS light/dark changes (no reload needed).
+    var _mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    if (_mq) {
+        var _onScheme = function () { if (app.theme === 'auto') applyTheme('auto'); };
+        if (_mq.addEventListener) _mq.addEventListener('change', _onScheme);
+        else if (_mq.addListener) _mq.addListener(_onScheme); // Safari < 14
+    }
 })();

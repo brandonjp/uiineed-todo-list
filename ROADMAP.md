@@ -4,7 +4,7 @@
 > UX, lightweight cross-device sync, import/export, theming, and assorted quality-of-life
 > features. Triaged by **impact vs. effort** so we ship the high-value, low-risk wins first.
 
-_Last updated: 2026-06-10_
+_Last updated: 2026-06-11 — release **v1.1.0** (Phases 0–3 + code-review hardening; see §10)._
 
 ---
 
@@ -269,11 +269,17 @@ shared-code refactor before the big features so we only build them once.
   possible later upgrade if manual file/clipboard sync proves tedious. Not built now.
 
 ### ⚠️ Verification status
-All JavaScript was validated by a **headless jsdom mount harness** that boots both pages,
-checks initial load / id-migration / filter-restore, and exercises add, sort, reorder,
-import+dedupe, bulk-add, and the theme engine (no template/render errors, no mustache leak).
-What still needs a **real browser / device**: visual look of the 5 themes (esp. Dark icon
-inversion), the touch long-press gesture feel, and clipboard permission prompts on iOS Safari.
+The pure data logic (parse / merge / dedupe / id-preservation / recycle restore) is now
+covered by a **committed, zero-dependency Node test** — `test/logic.test.js`, run with
+`node test/logic.test.js` (17 assertions, all passing). It loads the **real** `app.js` via
+a Node-only export hook, so it tests production code, not a copy. `node --check` is also run
+on `app.js` / `i18n.js`. (An earlier ad-hoc jsdom harness was used during development but was
+never committed; the committed test above replaces it for the logic layer.)
+
+What still needs a **real browser / device** (not yet verified — see §10 follow-ups): full
+DOM/Vue mount of both pages, the visual look of the 5 themes (esp. Dark icon inversion), the
+touch long-press gesture feel, clipboard permission prompts on iOS Safari, and the
+language auto-redirect across hosting layouts.
 
 ### Effort/impact summary
 
@@ -418,3 +424,71 @@ Once the above is in place, adding a language is **data-only — no logic change
 It's medium effort but it **removes the EN/ZH drift permanently** and makes every later feature
 (themes, settings, clipboard sync, mobile drag) a single implementation instead of two. It also
 turns "support more languages" from a copy-the-whole-file chore into appending one dictionary.
+
+---
+
+## 10. Code review & release hardening (2026-06-11, v1.1.0)
+
+A full review of everything built in Phases 0–3, before tagging the first tracked
+release. An independent reviewer pass plus targeted verification. Fixes below are
+**done and committed**; the follow-ups need eyes/hardware this session couldn't provide.
+
+### Fixed this pass (all in `public/js/app.js` unless noted)
+- 🔴 **Data corruption editing a trashed item.** Double-clicking a Trash item, clearing
+  its title, and pressing Enter called `removeTodo` on an item not in `todos`;
+  `splice(indexOf → -1)` silently moved/deleted the **wrong** item. `removeTodo` and
+  `restoreTodo` now bail when `indexOf` returns `-1`.
+- 🔴 **Cross-device sync discarded stable ids.** `mergeImport` generated a fresh id for
+  every imported item, so the second device never adopted the first device's ids — an
+  edited title then duplicated on the next re-import. Non-colliding **incoming ids are now
+  preserved**, so id-based dedupe actually works across devices (covered by tests).
+- 🟠 **Full backups didn't restore the recycle bin.** Export includes `recycleBin`
+  (IO-5) but import dropped it. `parseRecycle` + `applyImport` now merge trashed items
+  back (deduped) and re-flag them `removed`.
+- 🟠 **Storage writes could throw.** Every `localStorage.setItem` now goes through
+  `safeSet` (try/catch), so a full or disabled store (Safari private mode, quota) can't
+  break Vue reactivity mid-update.
+- 🟠 **`auto` theme didn't react to live OS changes.** Added a `prefers-color-scheme`
+  `matchMedia` listener that re-applies the theme without a reload.
+- 🟡 **Reliability nits:** `dragIndex` uses `null` not `''`; the enter-animation hook has a
+  600 ms fallback so an item can't hang if `transitionend` never fires; the import file
+  `<input>` is removed in its change handler (the synchronous removal broke the iOS Safari
+  file picker); `input.accept` now lists MIME types too.
+- 🟡 **SCSS drift.** The themes/modals/touch styles existed only in compiled
+  `style.css` / `style.min.css`; they're now mirrored back into the `style.scss` source.
+- 🟢 **Versioning + tests.** `version` meta in both pages + `window.UIINEED_VERSION`;
+  `CHANGELOG.md` added; `test/logic.test.js` (zero-dep, tests real `app.js`).
+
+### Confirmed NOT bugs (looked at, left as-is)
+- `clearCompleted` / `clearAll` read computed snapshots that *look* fragile but are correct
+  (`leftTodos` filters on `!completed`, and `loadState` always re-flags `removed` by list).
+- Todo titles render through Vue `{{ }}` mustaches (auto-escaped); dialogs use `textContent`.
+  No XSS path remains.
+
+### ⬜ Follow-ups — need a human / real browser / device
+1. **On-device verification (highest).** Mount both pages in a real browser + a phone:
+   theme visuals (esp. Dark icon inversion + contrast on mobile), the touch long-press
+   reorder feel, and iOS Safari clipboard permission prompts. The Node test covers data
+   logic only — there is **no** automated DOM/render test yet.
+2. **Language auto-redirect is hosting-fragile (pre-existing).** In `index.html` /
+   `index-zh.html`, `window.location.href = …replace('index.html', …)` does nothing when
+   the URL has no `index.html` segment (e.g. served at `/todo/`), which can assign the same
+   URL and risk a reload loop. Left untouched to avoid breaking the live deploy blindly —
+   **needs testing against the actual hosting layout** before changing.
+3. **`normKey` dedupe is case/space-folded.** For items that match by id this is moot
+   (the id path updates in place). For **id-less / legacy** items, a capitalization-only
+   edit is treated as a duplicate and skipped. Acceptable today; revisit if users hit it.
+4. **Settings panel is theme-only.** SET-1 envisioned sync controls + an auto-sort toggle
+   living there too; today those actions sit directly in the sidebar. Fine for v1.1.0.
+5. **Modal a11y / Escape.** The bulk / paste / settings modals close on backdrop click but
+   lack `role="dialog"`, focus-trap, and Escape-to-close (the custom alert/confirm do
+   handle Escape). Low priority polish.
+6. **Slogan is not restored on import.** A full backup includes the slogan, but import
+   intentionally does **not** overwrite the current slogan (a merge shouldn't clobber a
+   single value silently). Revisit if a true "restore backup" mode is wanted.
+7. **Templates are still duplicated** across the two HTML files (only logic/strings were
+   deduped). New markup must still be added twice and verified in sync — see TECH-DEBT-1.
+
+### Remaining planned work (unchanged from §7)
+- **MOB-2…MOB-5** mobile polish + PWA manifest (Phase 3 remainder).
+- **Sync Option A** (hosted Worker + KV "Sync ID") — deferred.

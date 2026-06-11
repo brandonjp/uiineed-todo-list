@@ -1,0 +1,140 @@
+/*
+ * logic.test.js — zero-dependency unit tests for the pure data helpers in
+ * public/js/app.js (parse / merge / dedupe / normalize). Run with:
+ *
+ *     node test/logic.test.js
+ *
+ * No npm install, no jsdom, no browser. app.js exports these helpers only when
+ * loaded under Node (its "Node test hook"); in a browser that hook is skipped,
+ * so this file tests the exact production code path used by the app.
+ *
+ * Covers the cross-device sync contract that the ROADMAP promises:
+ *   export on device A -> import on device B -> re-import must NOT duplicate,
+ *   stable ids propagate, edited titles update in place, full backups restore
+ *   the recycle bin.
+ */
+'use strict';
+
+var assert = require('assert');
+var path = require('path');
+var core = require(path.join(__dirname, '..', 'public', 'js', 'app.js'));
+
+var passed = 0;
+function test(name, fn) {
+    fn();
+    passed++;
+    console.log('  ok - ' + name);
+}
+
+console.log('app.js pure-logic tests');
+
+// ---- coerce -------------------------------------------------------------
+test('coerce: string -> todo with null id', function () {
+    assert.deepStrictEqual(core.coerce('Buy milk'),
+        { id: null, title: 'Buy milk', completed: false, removed: false });
+});
+test('coerce: object passthrough with !!flags', function () {
+    assert.deepStrictEqual(core.coerce({ id: 'x', title: 'A', completed: 1, removed: 0 }),
+        { id: 'x', title: 'A', completed: true, removed: false });
+});
+test('coerce: null -> empty todo', function () {
+    assert.strictEqual(core.coerce(null).title, '');
+});
+
+// ---- parseImport --------------------------------------------------------
+test('parseImport: JSON array of objects', function () {
+    var out = core.parseImport('[{"title":"A"},{"title":"B"}]');
+    assert.strictEqual(out.length, 2);
+    assert.strictEqual(out[0].title, 'A');
+});
+test('parseImport: {todos:[...]} backup object', function () {
+    var out = core.parseImport('{"todos":[{"title":"A"}],"recycleBin":[{"title":"Z"}]}');
+    assert.strictEqual(out.length, 1);
+    assert.strictEqual(out[0].title, 'A'); // only the active list, not recycleBin
+});
+test('parseImport: JSON array of strings', function () {
+    var out = core.parseImport('["A","B","C"]');
+    assert.strictEqual(out.length, 3);
+});
+test('parseImport: newline plain text, blanks skipped', function () {
+    var out = core.parseImport('A\n\n  \nB\n');
+    assert.strictEqual(out.length, 2);
+    assert.deepStrictEqual(out.map(function (t) { return t.title; }), ['A', 'B']);
+});
+test('parseImport: empty string -> []', function () {
+    assert.deepStrictEqual(core.parseImport(''), []);
+});
+test('parseImport: bare JSON number -> null (unparseable as todos)', function () {
+    assert.strictEqual(core.parseImport('123'), null);
+});
+
+// ---- parseRecycle -------------------------------------------------------
+test('parseRecycle: extracts recycleBin from full backup', function () {
+    var out = core.parseRecycle('{"todos":[{"title":"A"}],"recycleBin":[{"title":"Z"},{"title":"Y"}]}');
+    assert.strictEqual(out.length, 2);
+    assert.strictEqual(out[0].title, 'Z');
+});
+test('parseRecycle: plain list has no recycle bin -> []', function () {
+    assert.deepStrictEqual(core.parseRecycle('["A","B"]'), []);
+});
+
+// ---- mergeImport: the sync contract ------------------------------------
+test('mergeImport: preserves a non-colliding incoming id (FIX F4)', function () {
+    var target = [];
+    var res = core.mergeImport(target, [{ id: 'a1', title: 'X', completed: false }]);
+    assert.strictEqual(res.added, 1);
+    assert.strictEqual(target.length, 1);
+    assert.strictEqual(target[0].id, 'a1'); // not regenerated -> stable across devices
+});
+test('mergeImport: re-importing the SAME export creates no duplicates', function () {
+    var exportFile = [{ id: 'a1', title: 'X', completed: false }];
+    var target = [];
+    core.mergeImport(target, exportFile);
+    var res = core.mergeImport(target, exportFile); // second import of same data
+    assert.strictEqual(res.added, 0);
+    assert.strictEqual(res.skipped, 1);
+    assert.strictEqual(target.length, 1);
+});
+test('mergeImport: an edited title on the same id UPDATES in place (no dup)', function () {
+    var target = [];
+    core.mergeImport(target, [{ id: 'a1', title: 'X', completed: false }]);
+    var res = core.mergeImport(target, [{ id: 'a1', title: 'X edited', completed: true }]);
+    assert.strictEqual(res.updated, 1);
+    assert.strictEqual(res.added, 0);
+    assert.strictEqual(target.length, 1);
+    assert.strictEqual(target[0].title, 'X edited');
+    assert.strictEqual(target[0].completed, true);
+});
+test('mergeImport: id-less items dedupe by normalized title + completed', function () {
+    var target = [];
+    core.mergeImport(target, [{ title: 'Buy Milk' }]);
+    var res = core.mergeImport(target, [{ title: '  buy   milk ' }]); // same after normKey
+    assert.strictEqual(res.added, 0);
+    assert.strictEqual(res.skipped, 1);
+    assert.strictEqual(target.length, 1);
+});
+test('mergeImport: genuinely new id-less item is added', function () {
+    var target = [];
+    core.mergeImport(target, [{ title: 'A' }]);
+    var res = core.mergeImport(target, [{ title: 'B' }]);
+    assert.strictEqual(res.added, 1);
+    assert.strictEqual(target.length, 2);
+});
+test('mergeImport: two-device round trip converges (A->B->A, no growth)', function () {
+    // Device A starts with two items.
+    var A = [];
+    core.mergeImport(A, [{ id: 'a1', title: 'One', completed: false },
+                         { id: 'a2', title: 'Two', completed: false }]);
+    // Export A, import into empty B.
+    var B = [];
+    core.mergeImport(B, A.map(function (t) { return { id: t.id, title: t.title, completed: t.completed }; }));
+    assert.strictEqual(B.length, 2);
+    // Edit on B, then export B and import back into A.
+    B[0].title = 'One edited';
+    core.mergeImport(A, B.map(function (t) { return { id: t.id, title: t.title, completed: t.completed }; }));
+    assert.strictEqual(A.length, 2, 'A should not grow — ids match across devices');
+    var titles = A.map(function (t) { return t.title; }).sort();
+    assert.deepStrictEqual(titles, ['One edited', 'Two']);
+});
+
+console.log('\nAll ' + passed + ' tests passed.');

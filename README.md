@@ -21,7 +21,7 @@
 
 ## 使用说明
 
-在使用上为了尽量简洁，我使用了 CDN 的形式引入Vue，不需要安装，下载完直接打开 `html` 文件即可使用。
+在使用上为了尽量简洁，Vue 已本地内置（`public/js/vue.js`），无需 CDN、无需安装、完全离线，下载完直接打开 `html` 文件即可使用。
 
 自己上线的话，页面中也可以自定义显示个人的信息，为了体验不造成干扰，我默认注释掉了，如果需要的话，取消注释，修改为自己的信息即可。
 
@@ -52,11 +52,14 @@
 
 #### 食用方法 💡
 - ✔️ 所有提交操作支持Enter回车键提交
-- ✔️ 拖拽Todo上下移动可排序(仅支持PC)
+- ✔️ 拖拽 Todo 上下移动可排序（电脑直接拖拽，手机长按后拖动）
 - ✔️ 双击上面的标语和 Todo 可进行编辑
 - ✔️ 右侧的小窗口是快捷操作哦
+- 🎨 内置多套主题（深色 / 复古棕 / 海洋 / 高对比 / 柔和 / 跟随系统），可在「设置」中切换
 - 🔒 所有的Todo数据存储在浏览器本地
-- 📝 支持下载和导入，导入追加到当前序列
+- 📝 支持下载/导入、复制/粘贴、批量添加；导入会自动去重，可用于跨设备手动同步（iCloud/Dropbox/网盘）
+
+> 更新记录见 [CHANGELOG.md](./CHANGELOG.md)（当前版本 1.1.0）。
 
 ## 作者
 
@@ -92,7 +95,7 @@ In the design, I referenced the Noted design specification from the Figma commun
 
 ## Usage
 
-To keep things as simple as possible, I used a CDN to import Vue, so there's no need to install anything - just download and open the html file to use it.
+To keep things as simple as possible, Vue is vendored locally (`public/js/vue.js`) — no CDN, no install, fully offline. Just download and open the html file to use it.
 
 If you host it yourself, you can also customize the personal information displayed on the page. To avoid interference with the experience, I've commented this out by default. If you need it, just uncomment and modify the information to your own.
 
@@ -122,11 +125,14 @@ The personal information section is as follows:
 ```
 #### Usage Tips 💡
 - ✔️ Press Enter to submit all actions
-- ✔️ Drag to reorder your to-dos (PC only)
+- ✔️ Drag to reorder your to-dos (desktop drag, or long-press then drag on touch)
 - ✔️ Double-click to edit slogan and tasks
 - ✔️ Access quick actions in the right sidebar
+- 🎨 Built-in themes (Dark / Sepia / Ocean / High-Contrast / Pastel / Auto), switchable in **Settings**
 - 🔒 Your data is stored locally in your browser
-- 📝 Supports data download and import (appends to current list)
+- 📝 Download/import, copy/paste, and bulk-add; imports are de-duplicated, so you can sync across devices manually (iCloud/Dropbox/Drive)
+
+> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.1.0).
 
 ## Authors
 - Rico's Blog <a href="https://blog.ricocc.com/" target="_blank">@Ricocc</a>
