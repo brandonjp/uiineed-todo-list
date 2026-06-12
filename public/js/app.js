@@ -350,7 +350,11 @@
                 touchDragging: false,
                 touchTimer: null,
                 touchStartX: 0,
-                touchStartY: 0
+                touchStartY: 0,
+                showMore: false,
+                showPalette: false,
+                paletteQuery: '',
+                paletteIndex: 0
             };
         },
         watch: {
@@ -363,6 +367,7 @@
                 deep: true
             },
             intention: function (val) { safeSet(FILTER_KEY, val); },
+            paletteQuery: function () { this.paletteIndex = 0; },
             theme: function (val) {
                 safeSet(SETTINGS_KEY, JSON.stringify({ theme: val }));
                 applyTheme(val);
@@ -398,6 +403,65 @@
                     auto: t.themeAuto
                 };
                 return this.themeList.map(function (name) { return { value: name, label: labels[name] || name }; });
+            },
+            // Single source of truth for every command. Feeds both the More
+            // menu and the command palette. `when` controls availability.
+            actions: function () {
+                var self = this, t = this.t;
+                return [
+                    { id: 'sort',           label: t.sortAZ,           icon: '↕',  section: 'organize', when: this.todos.length > 1,         run: function () { self.sortAZ(); } },
+                    { id: 'finishAll',      label: t.finishAll,        icon: '✓',  section: 'organize', when: this.leftTodosCount > 0,       run: function () { self.markAllAsCompleted(); } },
+                    { id: 'clearCompleted', label: t.clearCompletedBtn, icon: '🧹', section: 'cleanup',  when: this.completedTodosCount > 0,  run: function () { self.clearCompleted(); } },
+                    { id: 'clearAll',       label: t.clearAllBtn,      icon: '🗑', section: 'cleanup',  danger: true, when: this.todos.length > 0, run: function () { self.clearAll(); } },
+                    { id: 'bulkAdd',        label: t.bulkAdd,          icon: '＋', section: 'data',     when: true,                          run: function () { self.openBulk(); } },
+                    { id: 'exportFile',     label: t.exportFile,       icon: '⤓',  section: 'data',     when: true,                          run: function () { self.exportFile(); } },
+                    { id: 'copy',           label: t.copyClipboard,    icon: '⧉',  section: 'data',     when: true,                          run: function () { self.copyToClipboard(); } },
+                    { id: 'importFile',     label: t.importFile,       icon: '⤒',  section: 'data',     when: true,                          run: function () { self.importFile(); } },
+                    { id: 'paste',          label: t.pasteClipboard,   icon: '⎘',  section: 'data',     when: true,                          run: function () { self.pasteFromClipboard(); } },
+                    { id: 'settings',       label: t.settings,         icon: '⚙',  section: 'app',      when: true,                          run: function () { self.openSettings(); } },
+                    { id: 'reload',         label: t.reload,           icon: '⟳',  section: 'app',      when: true,                          run: function () { location.reload(); } }
+                ];
+            },
+            // Grouped available actions for the More menu (Data is rendered
+            // separately as intent-paired rows, so it is excluded here).
+            moreSections: function () {
+                var avail = searchActions(this.actions, '');
+                var defs = [
+                    { key: 'organize', title: this.t.sectionOrganize },
+                    { key: 'cleanup',  title: this.t.sectionCleanup },
+                    { key: 'app',      title: this.t.sectionApp }
+                ];
+                return defs.map(function (d) {
+                    return {
+                        key: d.key, title: d.title,
+                        items: avail.filter(function (a) { return a.section === d.key; })
+                    };
+                });
+            },
+            // The one (or two) bulk actions relevant to the current filter view.
+            contextActions: function () {
+                var self = this, t = this.t;
+                if (this.intention === 'completed') {
+                    return this.completedTodosCount > 0
+                        ? [{ id: 'ctx-clearCompleted', label: t.clearCompletedBtn, run: function () { self.clearCompleted(); } }]
+                        : [];
+                }
+                if (this.intention === 'removed') {
+                    return this.recycleBin.length > 0
+                        ? [
+                            { id: 'ctx-restoreAll', label: t.restoreAll, run: function () { self.restoreAll(); } },
+                            { id: 'ctx-emptyTrash', label: t.emptyTrash, danger: true, run: function () { self.emptyTrash(); } }
+                          ]
+                        : [];
+                }
+                // all / ongoing
+                return this.leftTodosCount > 0
+                    ? [{ id: 'ctx-finishAll', label: t.finishAll, run: function () { self.markAllAsCompleted(); } }]
+                    : [];
+            },
+            // Available actions filtered by the palette query.
+            paletteResults: function () {
+                return searchActions(this.actions, this.paletteQuery);
             }
         },
         methods: {
@@ -706,7 +770,73 @@
             // Settings panel
             openSettings: function () { this.showSettings = true; },
             closeSettings: function () { this.showSettings = false; },
-            setTheme: function (name) { this.theme = name; }
+            setTheme: function (name) { this.theme = name; },
+
+            // ---- Trash bulk ops (used by the context bar) ----
+            restoreAll: function () {
+                var self = this;
+                this.recycleBin.slice().forEach(function (todo) {
+                    todo.removed = false;
+                    self.todos.push(todo);
+                });
+                this.recycleBin = [];
+                this.intention = 'all';
+            },
+            emptyTrash: function () {
+                var self = this;
+                confirm(this.t.confirmEmptyTrash).then(function (ok) {
+                    if (ok) { self.recycleBin = []; self.intention = 'all'; }
+                });
+            },
+
+            // ---- More menu + command palette ----
+            byId: function (id) {
+                var a = this.actions;
+                for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
+                return null;
+            },
+            openMore: function () { this.showMore = true; },
+            closeMore: function () { this.showMore = false; },
+            runAction: function (a) {
+                this.closeMore();
+                this.closePalette();
+                if (a && typeof a.run === 'function') a.run();
+            },
+            openPalette: function () {
+                this.paletteQuery = '';
+                this.paletteIndex = 0;
+                this.showPalette = true;
+                var self = this;
+                this.$nextTick(function () {
+                    if (self.$refs.paletteInput) self.$refs.paletteInput.focus();
+                });
+            },
+            closePalette: function () { this.showPalette = false; },
+            paletteMove: function (delta) {
+                var n = this.paletteResults.length;
+                if (!n) return;
+                this.paletteIndex = (this.paletteIndex + delta + n) % n;
+            },
+            paletteEnter: function () {
+                var a = this.paletteResults[this.paletteIndex];
+                if (a) this.runAction(a);
+            },
+            onKeydown: function (e) {
+                // Cmd/Ctrl+K toggles the palette from anywhere.
+                if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+                    e.preventDefault();
+                    if (this.showPalette) this.closePalette(); else this.openPalette();
+                    return;
+                }
+                if (e.key === 'Escape') {
+                    if (this.showPalette) { this.closePalette(); return; }
+                    if (this.showMore) { this.closeMore(); return; }
+                }
+                if (!this.showPalette) return;
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.paletteMove(1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.paletteMove(-1); }
+                else if (e.key === 'Enter') { e.preventDefault(); this.paletteEnter(); }
+            }
         },
         directives: {
             focus: {
@@ -728,6 +858,10 @@
                 window.fullWidth = document.documentElement.clientWidth;
                 self.windowWidth = window.fullWidth;
             };
+            document.addEventListener('keydown', this.onKeydown);
+        },
+        beforeDestroy: function () {
+            document.removeEventListener('keydown', this.onKeydown);
         }
     });
 
