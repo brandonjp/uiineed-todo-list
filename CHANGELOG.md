@@ -1,0 +1,69 @@
+# Changelog
+
+All notable changes to this project are documented here.
+The format is based on [Keep a Changelog](https://keepachangelog.com/),
+and this project aims to follow [Semantic Versioning](https://semver.org/).
+
+## [1.1.0] — 2026-06-11
+
+First tracked release. A round of improvements (audit fixes, shared-code
+refactor, sync, theming, mobile drag) followed by a full code-review hardening
+pass. See `ROADMAP.md` for the planning detail.
+
+### Added
+- **Shared code architecture.** All app logic now lives in `public/js/app.js`
+  and all UI strings in `public/js/i18n.js`; `index.html` (EN) and
+  `index-zh.html` (ZH) load the same modules instead of duplicating logic.
+  Adding a language is now data-only (a new block in `i18n.js`).
+- **Themes + settings panel.** Classic, Dark, Sepia, Ocean, High-Contrast,
+  Pastel, and Auto (follows the OS light/dark setting, live). Persisted to
+  `uiineed-settings`.
+- **Import / export overhaul.** Copy-to-clipboard and paste-from-clipboard
+  (with a textarea fallback), a bulk-add modal, and a hardened parser that
+  accepts a JSON array, a `{todos:[…]}` backup object, a JSON array of strings,
+  or newline-delimited text. Exports are now a full JSON backup.
+- **Dedupe on import / bulk-add.** Re-importing an overlapping export no longer
+  creates duplicates: items are matched by stable id first, then by normalized
+  title + completed state, and the result is reported (added / updated /
+  skipped). This is the supported cross-device sync path (file/clipboard via
+  iCloud/Dropbox/Drive).
+- **Touch drag-to-reorder** on mobile (long-press to pick up; a quick swipe
+  still scrolls).
+- **Persisted recycle bin** (`uiineed-recycle`) — deleted items survive a
+  refresh and the Trash filter is populated on load.
+- **Quality-of-life:** persisted last-used filter, one-shot A–Z sort, a Reload
+  button (for Home-Screen web-app use), and the delete (×) is hidden while an
+  item's inline editor is open.
+- **Versioning + test harness.** A `version` meta tag in both pages and
+  `window.UIINEED_VERSION`; a zero-dependency Node test (`test/logic.test.js`)
+  that exercises the real parse/merge/dedupe code (`node test/logic.test.js`).
+
+### Fixed (code-review hardening, 2026-06-11)
+- **Data loss when editing a trashed item to an empty title.** `removeTodo` /
+  `restoreTodo` did `splice(indexOf(...))` without checking for `-1`, so a miss
+  spliced index `-1` and silently moved/deleted the wrong item. Both now guard.
+- **Cross-device sync dropped stable ids.** `mergeImport` regenerated an id for
+  every imported item, so edited titles produced duplicates on a later
+  re-import. Non-colliding incoming ids are now preserved.
+- **Full backups didn't restore the recycle bin.** Exports include `recycleBin`
+  but import ignored it; trashed items are now restored (and deduped) on import.
+- **Stable ids replaced XSS-prone dialogs.** Custom `alert`/`confirm` set text
+  via `textContent` (no `innerHTML`), removing the import-error XSS vector.
+- **Storage writes no longer throw.** All `localStorage` writes are wrapped so a
+  full/disabled store (e.g. Safari private mode) can't break Vue reactivity.
+- **`auto` theme reacts to live OS changes** without a reload.
+- **Robustness:** `dragIndex` uses `null` (not `''`); the enter animation has a
+  fallback so an item can't hang if `transitionend` never fires; the import file
+  `<input>` is cleaned up in the change handler (fixes the iOS Safari picker).
+- Synced the new styles back into the `style.scss` source (they previously
+  existed only in the compiled `style.css` / `style.min.css`).
+
+### Security
+- Added `rel="noopener noreferrer"` to all `target="_blank"` links.
+- Removed dead/legacy code (`shuffle`, `lineFeed`, empty watcher, debug logs).
+
+## [1.0.0] — baseline
+
+The original Uiineed Todo List by RicoCC: a static, build-free Vue 2.x todo app
+with localStorage persistence, EN/ZH pages, recycle bin, inline edit, and
+file import/export.

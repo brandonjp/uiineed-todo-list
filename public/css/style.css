@@ -1760,3 +1760,40 @@ span.shortcut-name {
 .custom-alert-btn.cancel {
   background: var(--deleted);
 }
+/* Bulk-add / paste-import modals (added with shared app.js refactor) */
+.ui-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(51, 50, 46, 0.5); z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 16px; }
+.ui-modal { background: var(--bg-normal); border: var(--border); border-radius: var(--border-radius); box-shadow: var(--box-shadow); width: 100%; max-width: 480px; padding: 24px; font-family: var(--font); animation: popIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; box-sizing: border-box; }
+.ui-modal-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; color: var(--font-color); }
+.ui-modal-hint { font-size: 14px; color: var(--placeholder); margin-bottom: 14px; }
+.ui-modal-textarea { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; border: var(--border); border-radius: var(--border-radius); padding: 12px 14px; font-family: var(--font); font-size: var(--font-size-base); background: #fff; color: var(--font-color); margin-bottom: 18px; }
+.ui-modal-buttons { display: flex; justify-content: flex-end; gap: 12px; }
+
+/* ===== Settings panel chips ===== */
+.settings-row { margin-bottom: 18px; }
+.settings-label { font-weight: 700; margin-bottom: 10px; color: var(--font-color); }
+.theme-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.theme-chip { padding: 8px 14px; border: var(--border); border-radius: var(--border-radius); background: var(--bg-normal); color: var(--font-color); cursor: pointer; font-weight: 600; font-family: var(--font); transition: transform 0.2s, box-shadow 0.2s; }
+.theme-chip:hover { box-shadow: var(--box-shadow); transform: translate(-2px, -2px); }
+.theme-chip.selected { background: var(--completed); box-shadow: var(--box-shadow); }
+
+/* ===== Themes (override :root custom properties) ===== */
+/* Sepia — warm, readable */
+[data-theme="sepia"] { --body-bg:#f3e9d8; --font-color:#3a2f24; --placeholder:rgba(58,47,36,.55); --font-color-complete:rgba(58,47,36,.5); --bg-normal:#efe2c9; --bg-submit:#e9c9a0; --bg-completed:#dcd2b0; --bg-discard:#efe0cf; --bg-deleted:#e3d6bf; --bg-edit:#efe2c9; --normal:#d8b277; --completed:#bcae7c; --deleted:#cf9b7e; --black:#3a2f24; --border:2px solid #3a2f24; --box-shadow:4px 4px 0px #3a2f24; --box-shadow-reverse:-4px 4px 0px #3a2f24; }
+/* Ocean — cool, high legibility (mobile-friendly) */
+[data-theme="ocean"] { --body-bg:#e3f0f7; --font-color:#16323f; --placeholder:rgba(22,50,63,.55); --font-color-complete:rgba(22,50,63,.5); --bg-normal:#eaf3fa; --bg-submit:#bfe3f2; --bg-completed:#c7ece6; --bg-discard:#e3eef5; --bg-deleted:#dbe6ee; --bg-edit:#eaf3fa; --normal:#8fc7e8; --completed:#86d0c6; --deleted:#f3a8a0; --black:#16323f; --border:2px solid #16323f; --box-shadow:4px 4px 0px #16323f; --box-shadow-reverse:-4px 4px 0px #16323f; }
+/* Pastel — soft */
+[data-theme="pastel"] { --body-bg:#fbeffb; --font-color:#4a3a52; --placeholder:rgba(74,58,82,.55); --font-color-complete:rgba(74,58,82,.5); --bg-normal:#f7eefb; --bg-submit:#ffd6ef; --bg-completed:#d6f4ec; --bg-discard:#f6e8f6; --bg-deleted:#ece3f0; --bg-edit:#f7eefb; --normal:#f3c4e3; --completed:#bfe8da; --deleted:#f6b0c0; --black:#4a3a52; --border:2px solid #4a3a52; --box-shadow:4px 4px 0px #4a3a52; --box-shadow-reverse:-4px 4px 0px #4a3a52; }
+/* High Contrast — bold borders, maximum legibility (mobile-friendly) */
+[data-theme="contrast"] { --body-bg:#ffffff; --font-color:#000000; --placeholder:#444444; --font-color-complete:#555555; --bg-normal:#ffffff; --bg-submit:#ffe600; --bg-completed:#00e0c0; --bg-discard:#ffffff; --bg-deleted:#eeeeee; --bg-edit:#ffffff; --normal:#ffd400; --completed:#00d9b8; --deleted:#ff5a5a; --black:#000000; --border:2px solid #000000; --box-shadow:4px 4px 0px #000000; --box-shadow-reverse:-4px 4px 0px #000000; }
+/* Dark — light text on dark, with icon inversion (mobile-friendly) */
+[data-theme="dark"] { --body-bg:#1e1e1c; --font-color:#f0ede6; --placeholder:rgba(240,237,230,.5); --font-color-complete:rgba(240,237,230,.45); --bg-normal:#2b2b28; --bg-submit:#7a4f63; --bg-completed:#2f5d57; --bg-discard:#3a2f2e; --bg-deleted:#3a3a36; --bg-edit:#33302e; --normal:#b58a4f; --completed:#5fa79b; --deleted:#b5675c; --black:#f0ede6; --border:2px solid #555049; --box-shadow:4px 4px 0px #000000; --box-shadow-reverse:-4px 4px 0px #000000; }
+[data-theme="dark"] .icon-finish,
+[data-theme="dark"] .btn-restore img,
+[data-theme="dark"] .btn-delete img,
+[data-theme="dark"] .btn-edit-submit img,
+[data-theme="dark"] .slogan-btn img,
+[data-theme="dark"] .title-1 { filter: invert(0.92); }
+
+/* Touch long-press drag feedback */
+.todo-item.touch-dragging .todo-content { box-shadow: var(--box-shadow); transform: scale(1.02); opacity: 0.92; }
+.todo-item.touch-dragging { z-index: 5; }
