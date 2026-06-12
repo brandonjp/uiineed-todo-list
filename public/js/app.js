@@ -168,6 +168,29 @@
         });
     }
 
+    // ---- Command/action helpers (pure, testable) ----
+    // Case-insensitive subsequence test: every char of `query` appears in
+    // `text` in order. Empty query matches anything.
+    function fuzzyMatch(text, query) {
+        text = String(text == null ? '' : text).toLowerCase();
+        query = String(query == null ? '' : query).toLowerCase().trim();
+        if (!query) return true;
+        var i = 0;
+        for (var j = 0; j < text.length && i < query.length; j++) {
+            if (text.charAt(j) === query.charAt(i)) i++;
+        }
+        return i === query.length;
+    }
+
+    // Filter an action list to the available ones (`when !== false`) whose
+    // `label` matches `query`. Empty query -> all available. Feeds both the
+    // More menu (query '') and the command palette (user query).
+    function searchActions(actions, query) {
+        return (actions || []).filter(function (a) {
+            return a && a.when !== false && fuzzyMatch(a.label, query);
+        });
+    }
+
     // ---- Node test hook -----------------------------------------------------
     // When loaded under Node (no DOM), export the pure helpers for the test
     // harness and stop before the browser bootstrap. In a browser `module` is
@@ -181,7 +204,9 @@
             parseRecycle: parseRecycle,
             normKey: normKey,
             mergeImport: mergeImport,
-            genId: genId
+            genId: genId,
+            fuzzyMatch: fuzzyMatch,
+            searchActions: searchActions
         };
         return;
     }

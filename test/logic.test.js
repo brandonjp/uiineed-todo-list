@@ -137,4 +137,41 @@ test('mergeImport: two-device round trip converges (A->B->A, no growth)', functi
     assert.deepStrictEqual(titles, ['One edited', 'Two']);
 });
 
+// ---- fuzzyMatch ---------------------------------------------------------
+test('fuzzyMatch: empty query matches anything', function () {
+    assert.strictEqual(core.fuzzyMatch('Sort A-Z', ''), true);
+});
+test('fuzzyMatch: case-insensitive subsequence match', function () {
+    assert.strictEqual(core.fuzzyMatch('Clear Completed', 'clr'), true);
+    assert.strictEqual(core.fuzzyMatch('Export file', 'expt'), true);
+});
+test('fuzzyMatch: non-subsequence fails', function () {
+    assert.strictEqual(core.fuzzyMatch('Export', 'zzz'), false);
+});
+test('fuzzyMatch: null/undefined text and query are safe', function () {
+    assert.strictEqual(core.fuzzyMatch(null, ''), true);
+    assert.strictEqual(core.fuzzyMatch(undefined, 'a'), false);
+});
+
+// ---- searchActions ------------------------------------------------------
+test('searchActions: drops unavailable (when === false) actions', function () {
+    var acts = [
+        { id: 'a', label: 'Sort A-Z', when: true },
+        { id: 'b', label: 'Clear All', when: false }
+    ];
+    var out = core.searchActions(acts, '');
+    assert.strictEqual(out.length, 1);
+    assert.strictEqual(out[0].id, 'a');
+});
+test('searchActions: filters available actions by fuzzy query', function () {
+    var acts = [
+        { id: 'a', label: 'Sort A-Z', when: true },
+        { id: 'b', label: 'Export file', when: true },
+        { id: 'c', label: 'Import file', when: true }
+    ];
+    var out = core.searchActions(acts, 'expt');
+    assert.strictEqual(out.length, 1);
+    assert.strictEqual(out[0].id, 'b');
+});
+
 console.log('\nAll ' + passed + ' tests passed.');
