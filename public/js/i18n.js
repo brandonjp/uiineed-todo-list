@@ -122,6 +122,14 @@ window.I18N = {
         paletteEmpty: 'No matching commands',
         paletteShortcut: '⌘K',
 
+        // Inline confirm + sort
+        confirmReady: 'Tap to confirm',
+        sortBtn: 'Sort',
+        sortTitle: 'Sort by',
+        sortZA: 'Sort Z–A',
+        sortNewest: 'Newest first',
+        sortOldest: 'Oldest first',
+
         defaultSlogan: 'Act Now, Simplify Life.☕'
     },
 
@@ -237,6 +245,14 @@ window.I18N = {
         palettePlaceholder: '搜索操作…',
         paletteEmpty: '没有匹配的命令',
         paletteShortcut: '⌘K',
+
+        // 行内确认 + 排序
+        confirmReady: '点击确认',
+        sortBtn: '排序',
+        sortTitle: '排序方式',
+        sortZA: '排序 Z–A',
+        sortNewest: '最新在前',
+        sortOldest: '最早在前',
 
         defaultSlogan: '立即行动，简化生活。☕'
     }

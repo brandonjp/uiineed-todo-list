@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-06-12
+
+Follow-up polish on the new menu: safer destructive actions and richer sorting.
+
+### Added
+- **Multiple sort modes.** A prominent **"⇅ Sort"** button under the tabs opens
+  a menu: **A–Z**, **Z–A**, **Newest first**, **Oldest first**. Newest/Oldest are
+  derived from the timestamp already encoded in each item's id (no data-model
+  change). All four are also runnable from the ⌘K palette.
+
+### Changed
+- **Safer "Finish all".** Instead of a dismissible modal, the context-bar
+  "Finish all" now uses an inline two-step confirm: one tap arms it with a 3-second
+  countdown, then it reads **"Tap to confirm"** (highlighted) — only that second
+  tap completes everything. It auto-cancels if you switch views, press Esc, or
+  wait. (The More-menu / palette "Finish all" keeps its modal confirm.)
+
+### Internal
+- New pure helpers `idTime` / `compareBy` (unit-tested) back the sort modes; sort
+  commands live in the same `actions` registry, so they appear in the palette too.
+
 ## [1.2.0] — 2026-06-12
 
 A right-side-menu UX overhaul. The old ~15-button strip is reorganized around a

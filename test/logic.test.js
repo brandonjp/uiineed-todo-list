@@ -174,4 +174,35 @@ test('searchActions: filters available actions by fuzzy query', function () {
     assert.strictEqual(out[0].id, 'b');
 });
 
+// ---- idTime / compareBy (sort) -----------------------------------------
+function mkId(t) { return 't' + t.toString(36) + '-0'; }
+test('idTime: parses the timestamp baked into a genId-format id', function () {
+    assert.strictEqual(core.idTime(mkId(100)), 100);
+    assert.strictEqual(core.idTime(mkId(1700000000000)), 1700000000000);
+});
+test('idTime: non-matching id -> null', function () {
+    assert.strictEqual(core.idTime('42'), null);
+    assert.strictEqual(core.idTime(null), null);
+    assert.strictEqual(core.idTime(undefined), null);
+});
+test('compareBy: az / za sort by title', function () {
+    var arr = [{ title: 'banana' }, { title: 'apple' }, { title: 'cherry' }];
+    assert.deepStrictEqual(arr.slice().sort(core.compareBy('az')).map(function (x) { return x.title; }),
+        ['apple', 'banana', 'cherry']);
+    assert.deepStrictEqual(arr.slice().sort(core.compareBy('za')).map(function (x) { return x.title; }),
+        ['cherry', 'banana', 'apple']);
+});
+test('compareBy: newest / oldest sort by id timestamp', function () {
+    var arr = [{ title: 'mid', id: mkId(200) }, { title: 'new', id: mkId(300) }, { title: 'old', id: mkId(100) }];
+    assert.deepStrictEqual(arr.slice().sort(core.compareBy('oldest')).map(function (x) { return x.title; }),
+        ['old', 'mid', 'new']);
+    assert.deepStrictEqual(arr.slice().sort(core.compareBy('newest')).map(function (x) { return x.title; }),
+        ['new', 'mid', 'old']);
+});
+test('compareBy: items without a parseable id sort to the end', function () {
+    var arr = [{ title: 'noid' }, { title: 'has', id: mkId(100) }];
+    assert.deepStrictEqual(arr.slice().sort(core.compareBy('oldest')).map(function (x) { return x.title; }),
+        ['has', 'noid']);
+});
+
 console.log('\nAll ' + passed + ' tests passed.');

@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.2.0';
+    var APP_VERSION = '1.3.0';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -191,6 +191,31 @@
         });
     }
 
+    // Recover the creation timestamp baked into a genId-format id
+    // ('t' + base36(Date.now()) + '-' + base36(counter)). Returns ms, or null
+    // for ids not in that shape (imported/legacy) so they can sort to the end.
+    function idTime(id) {
+        if (typeof id !== 'string') return null;
+        var m = /^t([0-9a-z]+)-[0-9a-z]+$/.exec(id);
+        if (!m) return null;
+        var t = parseInt(m[1], 36);
+        return isNaN(t) ? null : t;
+    }
+
+    // Comparator factory for the one-shot sorts. Titles via localeCompare;
+    // newest/oldest via idTime, with unparseable ids pushed to the end.
+    function compareBy(mode) {
+        return function (a, b) {
+            if (mode === 'az') return String(a.title || '').localeCompare(String(b.title || ''));
+            if (mode === 'za') return String(b.title || '').localeCompare(String(a.title || ''));
+            var ta = idTime(a.id), tb = idTime(b.id);
+            if (ta == null && tb == null) return 0;
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return mode === 'newest' ? (tb - ta) : (ta - tb);
+        };
+    }
+
     // ---- Node test hook -----------------------------------------------------
     // When loaded under Node (no DOM), export the pure helpers for the test
     // harness and stop before the browser bootstrap. In a browser `module` is
@@ -206,7 +231,9 @@
             mergeImport: mergeImport,
             genId: genId,
             fuzzyMatch: fuzzyMatch,
-            searchActions: searchActions
+            searchActions: searchActions,
+            idTime: idTime,
+            compareBy: compareBy
         };
         return;
     }
@@ -354,7 +381,10 @@
                 showMore: false,
                 showPalette: false,
                 paletteQuery: '',
-                paletteIndex: 0
+                paletteIndex: 0,
+                showSort: false,
+                confirmId: null,
+                confirmCount: 0
             };
         },
         watch: {
@@ -366,7 +396,7 @@
                 handler: function (items) { recycleStorage.save(items); },
                 deep: true
             },
-            intention: function (val) { safeSet(FILTER_KEY, val); },
+            intention: function (val) { safeSet(FILTER_KEY, val); this.clearConfirm(); },
             paletteQuery: function () { this.paletteIndex = 0; },
             theme: function (val) {
                 safeSet(SETTINGS_KEY, JSON.stringify({ theme: val }));
@@ -409,7 +439,10 @@
             actions: function () {
                 var self = this, t = this.t;
                 return [
-                    { id: 'sort',           label: t.sortAZ,           icon: '↕',  section: 'organize', when: this.todos.length > 1,         run: function () { self.sortAZ(); } },
+                    { id: 'sort-az',        label: t.sortAZ,           icon: '↓',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('az'); } },
+                    { id: 'sort-za',        label: t.sortZA,           icon: '↑',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('za'); } },
+                    { id: 'sort-newest',    label: t.sortNewest,       icon: '🕒', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('newest'); } },
+                    { id: 'sort-oldest',    label: t.sortOldest,       icon: '🕘', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('oldest'); } },
                     { id: 'finishAll',      label: t.finishAll,        icon: '✓',  section: 'organize', when: this.leftTodosCount > 0,       run: function () { self.markAllAsCompleted(); } },
                     { id: 'clearCompleted', label: t.clearCompletedBtn, icon: '🧹', section: 'cleanup',  when: this.completedTodosCount > 0,  run: function () { self.clearCompleted(); } },
                     { id: 'clearAll',       label: t.clearAllBtn,      icon: '🗑', section: 'cleanup',  danger: true, when: this.todos.length > 0, run: function () { self.clearAll(); } },
@@ -456,12 +489,16 @@
                 }
                 // all / ongoing
                 return this.leftTodosCount > 0
-                    ? [{ id: 'ctx-finishAll', label: t.finishAll, run: function () { self.markAllAsCompleted(); } }]
+                    ? [{ id: 'ctx-finishAll', label: t.finishAll, confirm: true, run: function () { self.doFinishAll(); } }]
                     : [];
             },
             // Available actions filtered by the palette query.
             paletteResults: function () {
                 return searchActions(this.actions, this.paletteQuery);
+            },
+            // The available sort modes, for the dedicated Sort menu.
+            sortActions: function () {
+                return searchActions(this.actions, '').filter(function (a) { return a.section === 'sort'; });
             }
         },
         methods: {
@@ -511,11 +548,14 @@
             },
             markAsCompleted: function (todo) { todo.completed = true; },
             markAsUncompleted: function (todo) { todo.completed = false; },
+            // Bare action — no prompt. The context bar guards it with an inline
+            // two-step confirm; the More menu / palette guard it with a modal.
+            doFinishAll: function () {
+                this.todos.forEach(function (todo) { if (!todo.completed) todo.completed = true; });
+            },
             markAllAsCompleted: function () {
                 var self = this;
-                confirm(this.t.confirmMarkAll).then(function (ok) {
-                    if (ok) self.todos.forEach(function (todo) { if (!todo.completed) todo.completed = true; });
-                });
+                confirm(this.t.confirmMarkAll).then(function (ok) { if (ok) self.doFinishAll(); });
             },
 
             // Remove / restore
@@ -568,11 +608,11 @@
                 });
             },
 
-            // Auto-sort (QOL-2): one-shot alphabetical sort of the active list
-            sortAZ: function () {
-                this.todos.sort(function (a, b) {
-                    return (a.title || '').localeCompare(b.title || '');
-                });
+            // One-shot sort of the active list. modes: 'az' | 'za' | 'newest' | 'oldest'.
+            // In-place sort keeps Vue's array reactivity (persisted by the todos watcher).
+            sortBy: function (mode) {
+                this.todos.sort(compareBy(mode));
+                this.closeSort();
             },
 
             // ---- Export ----
@@ -797,10 +837,55 @@
             },
             openMore: function () { this.showMore = true; },
             closeMore: function () { this.showMore = false; },
+            openSort: function () { this.showSort = true; },
+            closeSort: function () { this.showSort = false; },
             runAction: function (a) {
                 this.closeMore();
                 this.closePalette();
+                this.closeSort();
                 if (a && typeof a.run === 'function') a.run();
+            },
+
+            // ---- Inline two-step confirm for prevalent destructive context actions ----
+            // Click once -> button counts down (disabled) -> 'Tap to confirm' -> runs.
+            contextLabel: function (a) {
+                if (this.confirmId !== a.id) return a.label;
+                return this.confirmCount > 0
+                    ? this.confirmCount + ''
+                    : this.t.confirmReady;
+            },
+            armConfirm: function (a) {
+                var self = this;
+                this.clearConfirm();
+                this.confirmId = a.id;
+                this.confirmCount = 3;
+                this._confirmTimer = setInterval(function () {
+                    self.confirmCount -= 1;
+                    if (self.confirmCount <= 0) {
+                        clearInterval(self._confirmTimer);
+                        self._confirmTimer = null;
+                        // Stay armed for a short grace window, then auto-cancel.
+                        self._confirmReset = setTimeout(function () { self.clearConfirm(); }, 6000);
+                    }
+                }, 1000);
+            },
+            clearConfirm: function () {
+                if (this._confirmTimer) { clearInterval(this._confirmTimer); this._confirmTimer = null; }
+                if (this._confirmReset) { clearTimeout(this._confirmReset); this._confirmReset = null; }
+                this.confirmId = null;
+                this.confirmCount = 0;
+            },
+            onContextClick: function (a) {
+                if (!a.confirm) { a.run(); return; }
+                if (this.confirmId === a.id) {
+                    if (this.confirmCount <= 0) {        // armed & ready -> go
+                        var run = a.run;
+                        this.clearConfirm();
+                        if (typeof run === 'function') run();
+                    }
+                    return;                              // still counting down -> ignore
+                }
+                this.armConfirm(a);
             },
             openPalette: function () {
                 this.paletteQuery = '';
@@ -831,6 +916,8 @@
                 if (e.key === 'Escape') {
                     if (this.showPalette) { this.closePalette(); return; }
                     if (this.showMore) { this.closeMore(); return; }
+                    if (this.showSort) { this.closeSort(); return; }
+                    if (this.confirmId) { this.clearConfirm(); return; }
                 }
                 if (!this.showPalette) return;
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.paletteMove(1); }
@@ -862,6 +949,7 @@
         },
         beforeDestroy: function () {
             document.removeEventListener('keydown', this.onKeydown);
+            this.clearConfirm();
         }
     });
 
