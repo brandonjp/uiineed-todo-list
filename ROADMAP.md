@@ -4,7 +4,10 @@
 > UX, lightweight cross-device sync, import/export, theming, and assorted quality-of-life
 > features. Triaged by **impact vs. effort** so we ship the high-value, low-risk wins first.
 
-_Last updated: 2026-06-11 — release **v1.1.0** (Phases 0–3 + code-review hardening; see §10)._
+_Last updated: 2026-06-12 — release **v1.2.0**: right-side menu UX overhaul —
+segmented filter tabs (with counts), a context-aware action bar, a "More" menu,
+and a ⌘K command palette, all driven by one action registry. (Prior: v1.1.0,
+Phases 0–3 + code-review hardening; see §10.)_
 
 ---
 

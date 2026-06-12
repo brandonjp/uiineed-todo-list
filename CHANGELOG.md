@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-06-12
+
+A right-side-menu UX overhaul. The old ~15-button strip is reorganized around a
+single data-driven action registry that feeds two surfaces.
+
+### Added
+- **Filter tabs.** All / In Progress / Completed / Trash are now a segmented tab
+  control with live count badges. All/In Progress/Completed are always shown (no
+  more jumpy menu); Trash appears only when it has items.
+- **Context action bar.** Each view shows only the bulk action that fits it:
+  Finish all (All/In Progress), Clear completed (Completed), and Restore all /
+  Empty trash (Trash).
+- **"More" menu.** Sort, Clear All (destructive), Add many, Settings, Reload, and
+  Export/Import live in one tidy panel. Export pairs File · Clipboard; Import
+  pairs File · Paste — same intent, channel as a secondary choice.
+- **Command palette (⌘K / Ctrl-K).** Fuzzy-search and run any action from the
+  keyboard; ↑/↓ to move, Enter to run, Esc to close.
+
+### Changed
+- The redundant top "Mark All Done" button folds into the context bar.
+- Added `restoreAll` / `emptyTrash` bulk Trash operations.
+
+### Internal
+- New pure helpers `fuzzyMatch` / `searchActions` (unit-tested) power both the
+  More menu and the palette from one `actions` registry.
+
 ## [1.1.0] — 2026-06-11
 
 First tracked release. A round of improvements (audit fixes, shared-code
