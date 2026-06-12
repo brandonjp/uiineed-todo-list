@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="version" content="1.1.0">
+        <meta name="version" content="1.2.0">
         <title>Todo List Online - Minimalist, No-Login Required Web Todo App</title>
         <meta
             name="keywords"
@@ -82,12 +82,6 @@
                 <div class="container main">
                     <div class="todo-list-box">
                         <div class="bar-message">
-                            <input
-                                type="button"
-                                class="btn btn-label btn-allFinish"
-                                :value="t.markAllDone"
-                                @click="markAllAsCompleted"
-                                v-if="todos.length || recycleBin.length"/>
                             <template>
                                 <div>
                                     <div v-if="!isEditing" @dblclick="editText" class="bar-message-text">
@@ -214,126 +208,41 @@
 
                         </div>
                         <div class="todo-footer-box">
-                            <ul class="todo-func-list filter">
-                                <!-- <li v-if="todos.length || recycleBin.length">Filter：</li> -->
-                                <!-- <li v-if="hasRemovedTodo" ><input type="button" value="Back"
-                                v-if="hasRemovedTodo" @click="restoreTodo()"></li> -->
-                                <li >
-                                    <input
-                                        class="btn-small action-showAll"
-                                        type="button"
-                                        :value="t.filterAll"
-                                        :class="{selected: intention === 'all'}"
-                                        @click="intention ='all'"></li>
-                                <li v-if="completedTodosCount"><input
-                                    class="btn-small action-progress"
-                                    type="button"
-                                    :value="t.filterOngoing"
-                                    v-if="leftTodosCount"
-                                    :class="{selected: intention === 'ongoing'}"
-                                    @click="intention ='ongoing'"></li>
-                                <li v-if="completedTodosCount">
-                                    <input
-                                        class="btn-small action-completed"
-                                        type="button"
-                                        :value="t.filterCompleted"
-                                        v-if="completedTodosCount"
-                                        :class="{selected: intention === 'completed'}"
-                                        @click="intention='completed'">
-                                </li>
-                                <li v-if="recycleBin.length">
-                                    <input
-                                        class="btn-small action-deleted"
-                                        type="button"
-                                        v-if="recycleBin.length"
-                                        :class="{selected: intention === 'removed'}"
-                                        :value="t.filterTrash"
-                                        @click="intention='removed'"/>
-                                </li>
-                            </ul>
-                            <ul class="todo-func-list batch">
-                                <!-- <li v-if="todos.length"></li> -->
-                                <li v-if="leftTodosCount">
-                                    <input
-                                        type="button"
-                                        class="btn-small completed-all"
-                                        v-if="leftTodosCount"
-                                        :value="t.finishAll"
-                                        @click="markAllAsCompleted">
-                                </li>
-                                <li v-if="completedTodosCount">
-                                    <input
-                                        type="button"
-                                        :value="t.clearCompletedBtn"
-                                        class="btn-small completed-clear"
-                                        v-if="completedTodosCount"
-                                        @click="clearCompleted">
-                                </li>
-                                <li v-if="todos.length"><input
-                                    type="button"
-                                    class="btn-small clear-all"
-                                    :value="t.clearAllBtn"
-                                    @click="clearAll">
-                                </li>
-                                <li v-if="todos.length > 1"><input
-                                    type="button"
-                                    class="btn-small action-sort"
-                                    :value="t.sortAZ"
-                                    @click="sortAZ">
-                                </li>
-                            </ul>
-                            <ul class="todo-func-list datasave">
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.settings"
-                                        class="btn-small action-settings"
-                                        @click="openSettings"/>
-                                </li>
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.bulkAdd"
-                                        class="btn-small action-bulk"
-                                        @click="openBulk"/>
-                                </li>
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.exportFile"
-                                        class="btn-small action-download"
-                                        @click="exportFile"/>
-                                </li>
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.copyClipboard"
-                                        class="btn-small action-copy"
-                                        @click="copyToClipboard"/>
-                                </li>
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.importFile"
-                                        class="btn-small action-import"
-                                        @click="importFile"/>
-                                </li>
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.pasteClipboard"
-                                        class="btn-small action-paste"
-                                        @click="pasteFromClipboard"/>
-                                </li>
-                                <li>
-                                    <input
-                                        type="button"
-                                        :value="t.reload"
-                                        class="btn-small action-reload"
-                                        :title="t.reloadTitle"
-                                        onclick="location.reload()"/>
-                                </li>
-                            </ul>
+                            <!-- Filters as segmented tabs -->
+                            <div class="todo-tabs" role="tablist">
+                                <button type="button" class="todo-tab" role="tab"
+                                    :class="{selected: intention==='all'}" @click="intention='all'">
+                                    <span class="tab-label">{{ t.filterAll }}</span>
+                                    <span class="tab-badge">{{ todos.length }}</span>
+                                </button>
+                                <button type="button" class="todo-tab" role="tab"
+                                    :class="{selected: intention==='ongoing'}" @click="intention='ongoing'">
+                                    <span class="tab-label">{{ t.filterOngoing }}</span>
+                                    <span class="tab-badge">{{ leftTodosCount }}</span>
+                                </button>
+                                <button type="button" class="todo-tab" role="tab"
+                                    :class="{selected: intention==='completed'}" @click="intention='completed'">
+                                    <span class="tab-label">{{ t.filterCompleted }}</span>
+                                    <span class="tab-badge">{{ completedTodosCount }}</span>
+                                </button>
+                                <button type="button" class="todo-tab" role="tab" v-if="recycleBin.length"
+                                    :class="{selected: intention==='removed'}" @click="intention='removed'">
+                                    <span class="tab-label">{{ t.filterTrash }}</span>
+                                    <span class="tab-badge">{{ recycleBin.length }}</span>
+                                </button>
+                            </div>
+
+                            <!-- Context-aware bulk action(s) for the current view -->
+                            <div class="context-bar" v-if="contextActions.length">
+                                <button type="button" v-for="a in contextActions" :key="a.id"
+                                    class="context-btn" :class="{danger: a.danger}" @click="a.run()">{{ a.label }}</button>
+                            </div>
+
+                            <!-- More menu + command palette triggers -->
+                            <div class="todo-actions-foot">
+                                <button type="button" class="more-btn" @click="openMore">⋯ {{ t.moreBtn }}</button>
+                                <button type="button" class="palette-btn" @click="openPalette" :title="t.paletteTitle">{{ t.paletteShortcut }}</button>
+                            </div>
 
                         </div>
 
@@ -382,6 +291,56 @@
                         <div class="ui-modal-buttons">
                             <button class="custom-alert-btn confirm" @click="closeSettings">{{ t.settingsClose }}</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- More actions panel -->
+                <div class="ui-modal-overlay more-overlay" v-if="showMore" @click.self="closeMore">
+                    <div class="more-panel">
+                        <div class="more-head">
+                            <span class="more-title">{{ t.moreTitle }}</span>
+                            <button type="button" class="more-close" @click="closeMore" aria-label="Close">×</button>
+                        </div>
+                        <div class="more-section" v-for="sec in moreSections" :key="sec.key" v-if="sec.items.length">
+                            <div class="more-section-title">{{ sec.title }}</div>
+                            <button type="button" v-for="a in sec.items" :key="a.id"
+                                class="more-item" :class="{danger: a.danger}" @click="runAction(a)">
+                                <span class="more-ico">{{ a.icon }}</span><span>{{ a.label }}</span>
+                            </button>
+                        </div>
+                        <div class="more-section">
+                            <div class="more-section-title">{{ t.sectionData }}</div>
+                            <button type="button" class="more-item" @click="runAction(byId('bulkAdd'))">
+                                <span class="more-ico">＋</span><span>{{ t.bulkAdd }}</span>
+                            </button>
+                            <div class="more-pair">
+                                <span class="more-pair-label">{{ t.exportLabel }}</span>
+                                <button type="button" class="more-chip" @click="runAction(byId('exportFile'))">{{ t.channelFile }}</button>
+                                <button type="button" class="more-chip" @click="runAction(byId('copy'))">{{ t.channelClipboard }}</button>
+                            </div>
+                            <div class="more-pair">
+                                <span class="more-pair-label">{{ t.importLabel }}</span>
+                                <button type="button" class="more-chip" @click="runAction(byId('importFile'))">{{ t.channelFile }}</button>
+                                <button type="button" class="more-chip" @click="runAction(byId('paste'))">{{ t.channelPaste }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Command palette -->
+                <div class="ui-modal-overlay palette-overlay" v-if="showPalette" @click.self="closePalette">
+                    <div class="palette">
+                        <input ref="paletteInput" type="text" class="palette-input"
+                            v-model="paletteQuery" :placeholder="t.palettePlaceholder"/>
+                        <ul class="palette-list" v-if="paletteResults.length">
+                            <li v-for="(a, i) in paletteResults" :key="a.id"
+                                class="palette-item" :class="{active: i===paletteIndex, danger: a.danger}"
+                                @click="runAction(a)" @mouseenter="paletteIndex = i">
+                                <span class="palette-ico">{{ a.icon }}</span>
+                                <span class="palette-label">{{ a.label }}</span>
+                            </li>
+                        </ul>
+                        <div class="palette-empty" v-else>{{ t.paletteEmpty }}</div>
                     </div>
                 </div>
 
