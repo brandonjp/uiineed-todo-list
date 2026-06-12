@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.3.0';
+    var APP_VERSION = '1.4.0';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -102,6 +102,8 @@
         }
         fix(todos, false);
         fix(recycle, true);
+        backfillCreatedAt(todos);
+        backfillCreatedAt(recycle);
         return { todos: todos, recycle: recycle };
     }
 
@@ -202,18 +204,50 @@
         return isNaN(t) ? null : t;
     }
 
-    // Comparator factory for the one-shot sorts. Titles via localeCompare;
-    // newest/oldest via idTime, with unparseable ids pushed to the end.
-    function compareBy(mode) {
-        return function (a, b) {
-            if (mode === 'az') return String(a.title || '').localeCompare(String(b.title || ''));
-            if (mode === 'za') return String(b.title || '').localeCompare(String(a.title || ''));
-            var ta = idTime(a.id), tb = idTime(b.id);
-            if (ta == null && tb == null) return 0;
-            if (ta == null) return 1;
-            if (tb == null) return -1;
-            return mode === 'newest' ? (tb - ta) : (ta - tb);
-        };
+    // Pure one-shot sort. Returns a NEW array of the same todo references in
+    // the requested order. modes: 'az' | 'za' | 'newest' | 'oldest'.
+    // Order key: createdAt if present, else the id timestamp; items with no
+    // signal keep their stored position. Original index is the stable tiebreak.
+    function sortTodos(list, mode) {
+        var decorated = (list || []).map(function (todo, i) {
+            var key = (todo && typeof todo.createdAt === 'number') ? todo.createdAt : idTime(todo && todo.id);
+            return { todo: todo, i: i, key: key };
+        });
+        decorated.sort(function (a, b) {
+            if (mode === 'az') return String(a.todo.title || '').localeCompare(String(b.todo.title || '')) || (a.i - b.i);
+            if (mode === 'za') return String(b.todo.title || '').localeCompare(String(a.todo.title || '')) || (a.i - b.i);
+            var ak = a.key, bk = b.key;
+            if (ak == null && bk == null) return a.i - b.i;
+            if (ak == null) return 1;   // no-signal items sink to the end
+            if (bk == null) return -1;
+            return (mode === 'newest' ? (bk - ak) : (ak - bk)) || (a.i - b.i);
+        });
+        return decorated.map(function (x) { return x.todo; });
+    }
+
+    // Backfill a stable createdAt on items that lack one, so newest/oldest work
+    // for legacy todos whose ids predate the timestamped-id scheme. Uses the id
+    // timestamp when parseable; otherwise a synthetic stamp placed below all
+    // known ones, preserving stored order (front = newest, since adds unshift).
+    function backfillCreatedAt(list) {
+        var i, t, min = Infinity, missing = [];
+        for (i = 0; i < list.length; i++) {
+            if (typeof list[i].createdAt === 'number') { if (list[i].createdAt < min) min = list[i].createdAt; continue; }
+            t = idTime(list[i].id);
+            if (t != null) { list[i].createdAt = t; if (t < min) min = t; }
+            else missing.push(i);
+        }
+        if (!isFinite(min)) min = 0;
+        for (i = 0; i < missing.length; i++) list[missing[i]].createdAt = min - 1 - i;
+        return list;
+    }
+
+    // Strictly-increasing creation stamp (handles multiple adds in one ms).
+    var _lastStamp = 0;
+    function nextStamp() {
+        var now = Date.now();
+        _lastStamp = now > _lastStamp ? now : _lastStamp + 1;
+        return _lastStamp;
     }
 
     // ---- Node test hook -----------------------------------------------------
@@ -233,7 +267,7 @@
             fuzzyMatch: fuzzyMatch,
             searchActions: searchActions,
             idTime: idTime,
-            compareBy: compareBy
+            sortTodos: sortTodos
         };
         return;
     }
@@ -443,6 +477,7 @@
                     { id: 'sort-za',        label: t.sortZA,           icon: '↑',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('za'); } },
                     { id: 'sort-newest',    label: t.sortNewest,       icon: '🕒', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('newest'); } },
                     { id: 'sort-oldest',    label: t.sortOldest,       icon: '🕘', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('oldest'); } },
+                    { id: 'sort-random',    label: t.sortRandom,       icon: '🔀', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('random'); } },
                     { id: 'finishAll',      label: t.finishAll,        icon: '✓',  section: 'organize', when: this.leftTodosCount > 0,       run: function () { self.markAllAsCompleted(); } },
                     { id: 'clearCompleted', label: t.clearCompletedBtn, icon: '🧹', section: 'cleanup',  when: this.completedTodosCount > 0,  run: function () { self.clearCompleted(); } },
                     { id: 'clearAll',       label: t.clearAllBtn,      icon: '🗑', section: 'cleanup',  danger: true, when: this.todos.length > 0, run: function () { self.clearAll(); } },
@@ -541,7 +576,7 @@
             // Add / complete
             addTodo: function () {
                 if (this.newTodoTitle === '') { this.checkEmpty = true; return; }
-                this.todos.unshift({ id: genId(), title: this.newTodoTitle, completed: false, removed: false });
+                this.todos.unshift({ id: genId(), title: this.newTodoTitle, completed: false, removed: false, createdAt: nextStamp() });
                 this.newTodoTitle = '';
                 this.checkEmpty = false;
                 this.delayTime = '0';
@@ -608,10 +643,20 @@
                 });
             },
 
-            // One-shot sort of the active list. modes: 'az' | 'za' | 'newest' | 'oldest'.
-            // In-place sort keeps Vue's array reactivity (persisted by the todos watcher).
+            // One-shot reorder of the active list.
+            // modes: 'az' | 'za' | 'newest' | 'oldest' | 'random'.
+            // Reassigning todos keeps reactivity and persists via the watcher.
             sortBy: function (mode) {
-                this.todos.sort(compareBy(mode));
+                if (mode === 'random') {
+                    var a = this.todos.slice();
+                    for (var i = a.length - 1; i > 0; i--) {
+                        var j = Math.floor(Math.random() * (i + 1));
+                        var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+                    }
+                    this.todos = a;
+                } else {
+                    this.todos = sortTodos(this.todos, mode);
+                }
                 this.closeSort();
             },
 

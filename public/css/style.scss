@@ -905,7 +905,7 @@ a.inspiration:focus{
     align-items: flex-start;
     flex-direction: column;
     border:var(--border);
-    background: #fff;
+    background: var(--bg-normal);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     text-align: center;
@@ -1443,7 +1443,7 @@ span.shortcut-name{
 .ui-modal { background: var(--bg-normal); border: var(--border); border-radius: var(--border-radius); box-shadow: var(--box-shadow); width: 100%; max-width: 480px; padding: 24px; font-family: var(--font); animation: popIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; box-sizing: border-box; }
 .ui-modal-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; color: var(--font-color); }
 .ui-modal-hint { font-size: 14px; color: var(--placeholder); margin-bottom: 14px; }
-.ui-modal-textarea { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; border: var(--border); border-radius: var(--border-radius); padding: 12px 14px; font-family: var(--font); font-size: var(--font-size-base); background: #fff; color: var(--font-color); margin-bottom: 18px; }
+.ui-modal-textarea { width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical; border: var(--border); border-radius: var(--border-radius); padding: 12px 14px; font-family: var(--font); font-size: var(--font-size-base); background: var(--bg-normal); color: var(--font-color); margin-bottom: 18px; }
 .ui-modal-buttons { display: flex; justify-content: flex-end; gap: 12px; }
 
 /* ===== Settings panel chips ===== */
@@ -1507,12 +1507,12 @@ span.shortcut-name{
     min-width: 20px;
     padding: 1px 7px;
     border-radius: 999px;
-    background: rgba(51, 50, 46, 0.12);
+    background: rgba(128, 128, 128, 0.22);
     font-size: 12px;
     font-weight: 700;
     text-align: center;
 }
-.todo-tab.selected .tab-badge { background: rgba(51, 50, 46, 0.22); }
+.todo-tab.selected .tab-badge { background: rgba(128, 128, 128, 0.38); }
 
 .context-bar {
     display: flex;
@@ -1550,7 +1550,7 @@ span.shortcut-name{
     padding: 9px 12px;
     border: var(--border);
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-normal);
     color: var(--font-color);
     font-family: var(--font);
     font-size: 14px;
@@ -1564,7 +1564,7 @@ span.shortcut-name{
     padding: 9px 10px;
     border: var(--border);
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-normal);
     color: var(--font-color);
     font-family: var(--font);
     font-size: 12px;
@@ -1608,7 +1608,7 @@ span.shortcut-name{
     transition: background 0.15s;
 }
 .more-item:hover { background: var(--completed); }
-.more-item.danger { color: #b23b2e; }
+.more-item.danger { color: #d9483c; }
 .more-item.danger:hover { background: var(--deleted); }
 .more-ico { width: 20px; text-align: center; }
 .more-pair { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
@@ -1617,7 +1617,7 @@ span.shortcut-name{
     padding: 5px 12px;
     border: var(--border);
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-normal);
     color: var(--font-color);
     font-family: var(--font);
     font-size: 13px;
@@ -1647,7 +1647,7 @@ span.shortcut-name{
     padding: 14px 16px;
     border: 0;
     border-bottom: var(--border);
-    background: #fff;
+    background: var(--bg-normal);
     color: var(--font-color);
     font-family: var(--font);
     font-size: 16px;
@@ -1664,7 +1664,7 @@ span.shortcut-name{
     color: var(--font-color);
 }
 .palette-item.active { background: var(--normal); }
-.palette-item.danger { color: #b23b2e; }
+.palette-item.danger { color: #d9483c; }
 .palette-ico { width: 20px; text-align: center; }
 .palette-label { flex: 1 1 auto; }
 .palette-empty { padding: 20px 16px; text-align: center; color: var(--placeholder); }
@@ -1688,7 +1688,7 @@ span.shortcut-name{
     padding: 9px 12px;
     border: var(--border);
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-normal);
     color: var(--font-color);
     font-family: var(--font);
     font-size: 14px;

@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-06-12
+
+Sort reliability, a shuffle option, and theme-contrast fixes for the menu.
+
+### Fixed
+- **Newest / Oldest sort now works for everyone.** Ordering keys off a real
+  `createdAt` stamp instead of parsing the id, so todos with legacy/non-timestamped
+  ids sort correctly. `createdAt` is added to new items and backfilled on load
+  (from the id time when available, else stored position).
+- **Theme contrast.** The right-side menu (sidebar, tabs, More/Sort/palette
+  surfaces, chips, the command-palette input) and the bulk/paste textarea used a
+  hardcoded white background — unreadable on Dark / High-Contrast. They now use the
+  theme's `--bg-normal`, and badges/danger text use theme-safe colors.
+
+### Added
+- **Shuffle** sort mode (random order) in the Sort menu and ⌘K palette.
+
+### Internal
+- Pure `sortTodos` (replaces `compareBy`) + `backfillCreatedAt` / `nextStamp`;
+  unit tests updated to cover createdAt-priority and stable fallback ordering.
+
 ## [1.3.0] — 2026-06-12
 
 Follow-up polish on the new menu: safer destructive actions and richer sorting.

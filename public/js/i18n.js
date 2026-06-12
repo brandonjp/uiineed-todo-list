@@ -129,6 +129,7 @@ window.I18N = {
         sortZA: 'Sort Z–A',
         sortNewest: 'Newest first',
         sortOldest: 'Oldest first',
+        sortRandom: 'Shuffle',
 
         defaultSlogan: 'Act Now, Simplify Life.☕'
     },
@@ -253,6 +254,7 @@ window.I18N = {
         sortZA: '排序 Z–A',
         sortNewest: '最新在前',
         sortOldest: '最早在前',
+        sortRandom: '随机打乱',
 
         defaultSlogan: '立即行动，简化生活。☕'
     }

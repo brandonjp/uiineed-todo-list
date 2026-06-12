@@ -185,24 +185,35 @@ test('idTime: non-matching id -> null', function () {
     assert.strictEqual(core.idTime(null), null);
     assert.strictEqual(core.idTime(undefined), null);
 });
-test('compareBy: az / za sort by title', function () {
+function titles(arr) { return arr.map(function (x) { return x.title; }); }
+test('sortTodos: az / za by title', function () {
     var arr = [{ title: 'banana' }, { title: 'apple' }, { title: 'cherry' }];
-    assert.deepStrictEqual(arr.slice().sort(core.compareBy('az')).map(function (x) { return x.title; }),
-        ['apple', 'banana', 'cherry']);
-    assert.deepStrictEqual(arr.slice().sort(core.compareBy('za')).map(function (x) { return x.title; }),
-        ['cherry', 'banana', 'apple']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'az')), ['apple', 'banana', 'cherry']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'za')), ['cherry', 'banana', 'apple']);
 });
-test('compareBy: newest / oldest sort by id timestamp', function () {
+test('sortTodos: newest / oldest prefer createdAt', function () {
+    var arr = [{ title: 'mid', createdAt: 200 }, { title: 'new', createdAt: 300 }, { title: 'old', createdAt: 100 }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['old', 'mid', 'new']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'newest')), ['new', 'mid', 'old']);
+});
+test('sortTodos: falls back to the id timestamp when no createdAt', function () {
     var arr = [{ title: 'mid', id: mkId(200) }, { title: 'new', id: mkId(300) }, { title: 'old', id: mkId(100) }];
-    assert.deepStrictEqual(arr.slice().sort(core.compareBy('oldest')).map(function (x) { return x.title; }),
-        ['old', 'mid', 'new']);
-    assert.deepStrictEqual(arr.slice().sort(core.compareBy('newest')).map(function (x) { return x.title; }),
-        ['new', 'mid', 'old']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['old', 'mid', 'new']);
 });
-test('compareBy: items without a parseable id sort to the end', function () {
-    var arr = [{ title: 'noid' }, { title: 'has', id: mkId(100) }];
-    assert.deepStrictEqual(arr.slice().sort(core.compareBy('oldest')).map(function (x) { return x.title; }),
-        ['has', 'noid']);
+test('sortTodos: createdAt wins over id timestamp', function () {
+    var arr = [{ title: 'a', id: mkId(100), createdAt: 999 }, { title: 'b', id: mkId(500), createdAt: 1 }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['b', 'a']);
+});
+test('sortTodos: items with no order signal keep stored order (stable)', function () {
+    var arr = [{ title: 'one' }, { title: 'two' }, { title: 'three' }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'newest')), ['one', 'two', 'three']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['one', 'two', 'three']);
+});
+test('sortTodos: returns the same todo references, reordered', function () {
+    var a = { title: 'a', createdAt: 2 }, b = { title: 'b', createdAt: 1 };
+    var out = core.sortTodos([a, b], 'oldest');
+    assert.strictEqual(out[0], b);
+    assert.strictEqual(out[1], a);
 });
 
 console.log('\nAll ' + passed + ' tests passed.');
