@@ -137,4 +137,83 @@ test('mergeImport: two-device round trip converges (A->B->A, no growth)', functi
     assert.deepStrictEqual(titles, ['One edited', 'Two']);
 });
 
+// ---- fuzzyMatch ---------------------------------------------------------
+test('fuzzyMatch: empty query matches anything', function () {
+    assert.strictEqual(core.fuzzyMatch('Sort A-Z', ''), true);
+});
+test('fuzzyMatch: case-insensitive subsequence match', function () {
+    assert.strictEqual(core.fuzzyMatch('Clear Completed', 'clr'), true);
+    assert.strictEqual(core.fuzzyMatch('Export file', 'expt'), true);
+});
+test('fuzzyMatch: non-subsequence fails', function () {
+    assert.strictEqual(core.fuzzyMatch('Export', 'zzz'), false);
+});
+test('fuzzyMatch: null/undefined text and query are safe', function () {
+    assert.strictEqual(core.fuzzyMatch(null, ''), true);
+    assert.strictEqual(core.fuzzyMatch(undefined, 'a'), false);
+});
+
+// ---- searchActions ------------------------------------------------------
+test('searchActions: drops unavailable (when === false) actions', function () {
+    var acts = [
+        { id: 'a', label: 'Sort A-Z', when: true },
+        { id: 'b', label: 'Clear All', when: false }
+    ];
+    var out = core.searchActions(acts, '');
+    assert.strictEqual(out.length, 1);
+    assert.strictEqual(out[0].id, 'a');
+});
+test('searchActions: filters available actions by fuzzy query', function () {
+    var acts = [
+        { id: 'a', label: 'Sort A-Z', when: true },
+        { id: 'b', label: 'Export file', when: true },
+        { id: 'c', label: 'Import file', when: true }
+    ];
+    var out = core.searchActions(acts, 'expt');
+    assert.strictEqual(out.length, 1);
+    assert.strictEqual(out[0].id, 'b');
+});
+
+// ---- idTime / compareBy (sort) -----------------------------------------
+function mkId(t) { return 't' + t.toString(36) + '-0'; }
+test('idTime: parses the timestamp baked into a genId-format id', function () {
+    assert.strictEqual(core.idTime(mkId(100)), 100);
+    assert.strictEqual(core.idTime(mkId(1700000000000)), 1700000000000);
+});
+test('idTime: non-matching id -> null', function () {
+    assert.strictEqual(core.idTime('42'), null);
+    assert.strictEqual(core.idTime(null), null);
+    assert.strictEqual(core.idTime(undefined), null);
+});
+function titles(arr) { return arr.map(function (x) { return x.title; }); }
+test('sortTodos: az / za by title', function () {
+    var arr = [{ title: 'banana' }, { title: 'apple' }, { title: 'cherry' }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'az')), ['apple', 'banana', 'cherry']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'za')), ['cherry', 'banana', 'apple']);
+});
+test('sortTodos: newest / oldest prefer createdAt', function () {
+    var arr = [{ title: 'mid', createdAt: 200 }, { title: 'new', createdAt: 300 }, { title: 'old', createdAt: 100 }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['old', 'mid', 'new']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'newest')), ['new', 'mid', 'old']);
+});
+test('sortTodos: falls back to the id timestamp when no createdAt', function () {
+    var arr = [{ title: 'mid', id: mkId(200) }, { title: 'new', id: mkId(300) }, { title: 'old', id: mkId(100) }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['old', 'mid', 'new']);
+});
+test('sortTodos: createdAt wins over id timestamp', function () {
+    var arr = [{ title: 'a', id: mkId(100), createdAt: 999 }, { title: 'b', id: mkId(500), createdAt: 1 }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['b', 'a']);
+});
+test('sortTodos: items with no order signal keep stored order (stable)', function () {
+    var arr = [{ title: 'one' }, { title: 'two' }, { title: 'three' }];
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'newest')), ['one', 'two', 'three']);
+    assert.deepStrictEqual(titles(core.sortTodos(arr, 'oldest')), ['one', 'two', 'three']);
+});
+test('sortTodos: returns the same todo references, reordered', function () {
+    var a = { title: 'a', createdAt: 2 }, b = { title: 'b', createdAt: 1 };
+    var out = core.sortTodos([a, b], 'oldest');
+    assert.strictEqual(out[0], b);
+    assert.strictEqual(out[1], a);
+});
+
 console.log('\nAll ' + passed + ' tests passed.');

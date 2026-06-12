@@ -4,6 +4,74 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-06-12
+
+Sort reliability, a shuffle option, and theme-contrast fixes for the menu.
+
+### Fixed
+- **Newest / Oldest sort now works for everyone.** Ordering keys off a real
+  `createdAt` stamp instead of parsing the id, so todos with legacy/non-timestamped
+  ids sort correctly. `createdAt` is added to new items and backfilled on load
+  (from the id time when available, else stored position).
+- **Theme contrast.** The right-side menu (sidebar, tabs, More/Sort/palette
+  surfaces, chips, the command-palette input) and the bulk/paste textarea used a
+  hardcoded white background — unreadable on Dark / High-Contrast. They now use the
+  theme's `--bg-normal`, and badges/danger text use theme-safe colors.
+
+### Added
+- **Shuffle** sort mode (random order) in the Sort menu and ⌘K palette.
+
+### Internal
+- Pure `sortTodos` (replaces `compareBy`) + `backfillCreatedAt` / `nextStamp`;
+  unit tests updated to cover createdAt-priority and stable fallback ordering.
+
+## [1.3.0] — 2026-06-12
+
+Follow-up polish on the new menu: safer destructive actions and richer sorting.
+
+### Added
+- **Multiple sort modes.** A prominent **"⇅ Sort"** button under the tabs opens
+  a menu: **A–Z**, **Z–A**, **Newest first**, **Oldest first**. Newest/Oldest are
+  derived from the timestamp already encoded in each item's id (no data-model
+  change). All four are also runnable from the ⌘K palette.
+
+### Changed
+- **Safer "Finish all".** Instead of a dismissible modal, the context-bar
+  "Finish all" now uses an inline two-step confirm: one tap arms it with a 3-second
+  countdown, then it reads **"Tap to confirm"** (highlighted) — only that second
+  tap completes everything. It auto-cancels if you switch views, press Esc, or
+  wait. (The More-menu / palette "Finish all" keeps its modal confirm.)
+
+### Internal
+- New pure helpers `idTime` / `compareBy` (unit-tested) back the sort modes; sort
+  commands live in the same `actions` registry, so they appear in the palette too.
+
+## [1.2.0] — 2026-06-12
+
+A right-side-menu UX overhaul. The old ~15-button strip is reorganized around a
+single data-driven action registry that feeds two surfaces.
+
+### Added
+- **Filter tabs.** All / In Progress / Completed / Trash are now a segmented tab
+  control with live count badges. All/In Progress/Completed are always shown (no
+  more jumpy menu); Trash appears only when it has items.
+- **Context action bar.** Each view shows only the bulk action that fits it:
+  Finish all (All/In Progress), Clear completed (Completed), and Restore all /
+  Empty trash (Trash).
+- **"More" menu.** Sort, Clear All (destructive), Add many, Settings, Reload, and
+  Export/Import live in one tidy panel. Export pairs File · Clipboard; Import
+  pairs File · Paste — same intent, channel as a secondary choice.
+- **Command palette (⌘K / Ctrl-K).** Fuzzy-search and run any action from the
+  keyboard; ↑/↓ to move, Enter to run, Esc to close.
+
+### Changed
+- The redundant top "Mark All Done" button folds into the context bar.
+- Added `restoreAll` / `emptyTrash` bulk Trash operations.
+
+### Internal
+- New pure helpers `fuzzyMatch` / `searchActions` (unit-tested) power both the
+  More menu and the palette from one `actions` registry.
+
 ## [1.1.0] — 2026-06-11
 
 First tracked release. A round of improvements (audit fixes, shared-code

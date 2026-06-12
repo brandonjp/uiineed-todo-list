@@ -102,6 +102,35 @@ window.I18N = {
         themeAuto: 'Auto (system)',
         settingsClose: 'Done',
 
+        // Menu / tabs / context bar / palette
+        moreBtn: 'More',
+        moreTitle: 'Actions',
+        restoreAll: 'Restore all',
+        emptyTrash: 'Empty trash',
+        confirmEmptyTrash: 'Permanently delete everything in Trash? This cannot be undone.',
+        sectionOrganize: 'Organize',
+        sectionCleanup: 'Clean up',
+        sectionData: 'Data',
+        sectionApp: 'App',
+        exportLabel: 'Export',
+        importLabel: 'Import',
+        channelFile: 'File',
+        channelClipboard: 'Clipboard',
+        channelPaste: 'Paste',
+        paletteTitle: 'Commands',
+        palettePlaceholder: 'Search actions…',
+        paletteEmpty: 'No matching commands',
+        paletteShortcut: '⌘K',
+
+        // Inline confirm + sort
+        confirmReady: 'Tap to confirm',
+        sortBtn: 'Sort',
+        sortTitle: 'Sort by',
+        sortZA: 'Sort Z–A',
+        sortNewest: 'Newest first',
+        sortOldest: 'Oldest first',
+        sortRandom: 'Shuffle',
+
         defaultSlogan: 'Act Now, Simplify Life.☕'
     },
 
@@ -197,6 +226,35 @@ window.I18N = {
         themePastel: '柔和',
         themeAuto: '跟随系统',
         settingsClose: '完成',
+
+        // 菜单 / 标签 / 上下文操作 / 命令面板
+        moreBtn: '更多',
+        moreTitle: '操作',
+        restoreAll: '全部还原',
+        emptyTrash: '清空回收站',
+        confirmEmptyTrash: '永久删除回收站中的所有项目？此操作无法撤销。',
+        sectionOrganize: '整理',
+        sectionCleanup: '清理',
+        sectionData: '数据',
+        sectionApp: '应用',
+        exportLabel: '导出',
+        importLabel: '导入',
+        channelFile: '文件',
+        channelClipboard: '剪贴板',
+        channelPaste: '粘贴',
+        paletteTitle: '命令',
+        palettePlaceholder: '搜索操作…',
+        paletteEmpty: '没有匹配的命令',
+        paletteShortcut: '⌘K',
+
+        // 行内确认 + 排序
+        confirmReady: '点击确认',
+        sortBtn: '排序',
+        sortTitle: '排序方式',
+        sortZA: '排序 Z–A',
+        sortNewest: '最新在前',
+        sortOldest: '最早在前',
+        sortRandom: '随机打乱',
 
         defaultSlogan: '立即行动，简化生活。☕'
     }

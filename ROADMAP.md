@@ -4,7 +4,14 @@
 > UX, lightweight cross-device sync, import/export, theming, and assorted quality-of-life
 > features. Triaged by **impact vs. effort** so we ship the high-value, low-risk wins first.
 
-_Last updated: 2026-06-11 — release **v1.1.0** (Phases 0–3 + code-review hardening; see §10)._
+_Last updated: 2026-06-12 — release **v1.4.0**: reliable newest/oldest sort (via a
+backfilled `createdAt`), a Shuffle mode, and theme-contrast fixes for the menu on
+Dark / High-Contrast. Builds on **v1.3.0**: menu polish — multiple sort modes
+(A–Z / Z–A / newest / oldest) via a prominent Sort button, and a safer inline
+two-step confirm on "Finish all". And **v1.2.0**: right-side menu UX overhaul
+— segmented filter tabs (with counts), a context-aware action bar, a "More" menu,
+and a ⌘K command palette, all driven by one action registry. (Prior: v1.1.0,
+Phases 0–3 + code-review hardening; see §10.)_
 
 ---
 

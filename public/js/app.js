@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.1.0';
+    var APP_VERSION = '1.4.0';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -102,6 +102,8 @@
         }
         fix(todos, false);
         fix(recycle, true);
+        backfillCreatedAt(todos);
+        backfillCreatedAt(recycle);
         return { todos: todos, recycle: recycle };
     }
 
@@ -168,6 +170,86 @@
         });
     }
 
+    // ---- Command/action helpers (pure, testable) ----
+    // Case-insensitive subsequence test: every char of `query` appears in
+    // `text` in order. Empty query matches anything.
+    function fuzzyMatch(text, query) {
+        text = String(text == null ? '' : text).toLowerCase();
+        query = String(query == null ? '' : query).toLowerCase().trim();
+        if (!query) return true;
+        var i = 0;
+        for (var j = 0; j < text.length && i < query.length; j++) {
+            if (text.charAt(j) === query.charAt(i)) i++;
+        }
+        return i === query.length;
+    }
+
+    // Filter an action list to the available ones (`when !== false`) whose
+    // `label` matches `query`. Empty query -> all available. Feeds both the
+    // More menu (query '') and the command palette (user query).
+    function searchActions(actions, query) {
+        return (actions || []).filter(function (a) {
+            return a && a.when !== false && fuzzyMatch(a.label, query);
+        });
+    }
+
+    // Recover the creation timestamp baked into a genId-format id
+    // ('t' + base36(Date.now()) + '-' + base36(counter)). Returns ms, or null
+    // for ids not in that shape (imported/legacy) so they can sort to the end.
+    function idTime(id) {
+        if (typeof id !== 'string') return null;
+        var m = /^t([0-9a-z]+)-[0-9a-z]+$/.exec(id);
+        if (!m) return null;
+        var t = parseInt(m[1], 36);
+        return isNaN(t) ? null : t;
+    }
+
+    // Pure one-shot sort. Returns a NEW array of the same todo references in
+    // the requested order. modes: 'az' | 'za' | 'newest' | 'oldest'.
+    // Order key: createdAt if present, else the id timestamp; items with no
+    // signal keep their stored position. Original index is the stable tiebreak.
+    function sortTodos(list, mode) {
+        var decorated = (list || []).map(function (todo, i) {
+            var key = (todo && typeof todo.createdAt === 'number') ? todo.createdAt : idTime(todo && todo.id);
+            return { todo: todo, i: i, key: key };
+        });
+        decorated.sort(function (a, b) {
+            if (mode === 'az') return String(a.todo.title || '').localeCompare(String(b.todo.title || '')) || (a.i - b.i);
+            if (mode === 'za') return String(b.todo.title || '').localeCompare(String(a.todo.title || '')) || (a.i - b.i);
+            var ak = a.key, bk = b.key;
+            if (ak == null && bk == null) return a.i - b.i;
+            if (ak == null) return 1;   // no-signal items sink to the end
+            if (bk == null) return -1;
+            return (mode === 'newest' ? (bk - ak) : (ak - bk)) || (a.i - b.i);
+        });
+        return decorated.map(function (x) { return x.todo; });
+    }
+
+    // Backfill a stable createdAt on items that lack one, so newest/oldest work
+    // for legacy todos whose ids predate the timestamped-id scheme. Uses the id
+    // timestamp when parseable; otherwise a synthetic stamp placed below all
+    // known ones, preserving stored order (front = newest, since adds unshift).
+    function backfillCreatedAt(list) {
+        var i, t, min = Infinity, missing = [];
+        for (i = 0; i < list.length; i++) {
+            if (typeof list[i].createdAt === 'number') { if (list[i].createdAt < min) min = list[i].createdAt; continue; }
+            t = idTime(list[i].id);
+            if (t != null) { list[i].createdAt = t; if (t < min) min = t; }
+            else missing.push(i);
+        }
+        if (!isFinite(min)) min = 0;
+        for (i = 0; i < missing.length; i++) list[missing[i]].createdAt = min - 1 - i;
+        return list;
+    }
+
+    // Strictly-increasing creation stamp (handles multiple adds in one ms).
+    var _lastStamp = 0;
+    function nextStamp() {
+        var now = Date.now();
+        _lastStamp = now > _lastStamp ? now : _lastStamp + 1;
+        return _lastStamp;
+    }
+
     // ---- Node test hook -----------------------------------------------------
     // When loaded under Node (no DOM), export the pure helpers for the test
     // harness and stop before the browser bootstrap. In a browser `module` is
@@ -181,7 +263,11 @@
             parseRecycle: parseRecycle,
             normKey: normKey,
             mergeImport: mergeImport,
-            genId: genId
+            genId: genId,
+            fuzzyMatch: fuzzyMatch,
+            searchActions: searchActions,
+            idTime: idTime,
+            sortTodos: sortTodos
         };
         return;
     }
@@ -325,7 +411,14 @@
                 touchDragging: false,
                 touchTimer: null,
                 touchStartX: 0,
-                touchStartY: 0
+                touchStartY: 0,
+                showMore: false,
+                showPalette: false,
+                paletteQuery: '',
+                paletteIndex: 0,
+                showSort: false,
+                confirmId: null,
+                confirmCount: 0
             };
         },
         watch: {
@@ -337,7 +430,8 @@
                 handler: function (items) { recycleStorage.save(items); },
                 deep: true
             },
-            intention: function (val) { safeSet(FILTER_KEY, val); },
+            intention: function (val) { safeSet(FILTER_KEY, val); this.clearConfirm(); },
+            paletteQuery: function () { this.paletteIndex = 0; },
             theme: function (val) {
                 safeSet(SETTINGS_KEY, JSON.stringify({ theme: val }));
                 applyTheme(val);
@@ -373,6 +467,73 @@
                     auto: t.themeAuto
                 };
                 return this.themeList.map(function (name) { return { value: name, label: labels[name] || name }; });
+            },
+            // Single source of truth for every command. Feeds both the More
+            // menu and the command palette. `when` controls availability.
+            actions: function () {
+                var self = this, t = this.t;
+                return [
+                    { id: 'sort-az',        label: t.sortAZ,           icon: '↓',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('az'); } },
+                    { id: 'sort-za',        label: t.sortZA,           icon: '↑',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('za'); } },
+                    { id: 'sort-newest',    label: t.sortNewest,       icon: '🕒', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('newest'); } },
+                    { id: 'sort-oldest',    label: t.sortOldest,       icon: '🕘', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('oldest'); } },
+                    { id: 'sort-random',    label: t.sortRandom,       icon: '🔀', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('random'); } },
+                    { id: 'finishAll',      label: t.finishAll,        icon: '✓',  section: 'organize', when: this.leftTodosCount > 0,       run: function () { self.markAllAsCompleted(); } },
+                    { id: 'clearCompleted', label: t.clearCompletedBtn, icon: '🧹', section: 'cleanup',  when: this.completedTodosCount > 0,  run: function () { self.clearCompleted(); } },
+                    { id: 'clearAll',       label: t.clearAllBtn,      icon: '🗑', section: 'cleanup',  danger: true, when: this.todos.length > 0, run: function () { self.clearAll(); } },
+                    { id: 'bulkAdd',        label: t.bulkAdd,          icon: '＋', section: 'data',     when: true,                          run: function () { self.openBulk(); } },
+                    { id: 'exportFile',     label: t.exportFile,       icon: '⤓',  section: 'data',     when: true,                          run: function () { self.exportFile(); } },
+                    { id: 'copy',           label: t.copyClipboard,    icon: '⧉',  section: 'data',     when: true,                          run: function () { self.copyToClipboard(); } },
+                    { id: 'importFile',     label: t.importFile,       icon: '⤒',  section: 'data',     when: true,                          run: function () { self.importFile(); } },
+                    { id: 'paste',          label: t.pasteClipboard,   icon: '⎘',  section: 'data',     when: true,                          run: function () { self.pasteFromClipboard(); } },
+                    { id: 'settings',       label: t.settings,         icon: '⚙',  section: 'app',      when: true,                          run: function () { self.openSettings(); } },
+                    { id: 'reload',         label: t.reload,           icon: '⟳',  section: 'app',      when: true,                          run: function () { location.reload(); } }
+                ];
+            },
+            // Grouped available actions for the More menu (Data is rendered
+            // separately as intent-paired rows, so it is excluded here).
+            moreSections: function () {
+                var avail = searchActions(this.actions, '');
+                var defs = [
+                    { key: 'organize', title: this.t.sectionOrganize },
+                    { key: 'cleanup',  title: this.t.sectionCleanup },
+                    { key: 'app',      title: this.t.sectionApp }
+                ];
+                return defs.map(function (d) {
+                    return {
+                        key: d.key, title: d.title,
+                        items: avail.filter(function (a) { return a.section === d.key; })
+                    };
+                });
+            },
+            // The one (or two) bulk actions relevant to the current filter view.
+            contextActions: function () {
+                var self = this, t = this.t;
+                if (this.intention === 'completed') {
+                    return this.completedTodosCount > 0
+                        ? [{ id: 'ctx-clearCompleted', label: t.clearCompletedBtn, run: function () { self.clearCompleted(); } }]
+                        : [];
+                }
+                if (this.intention === 'removed') {
+                    return this.recycleBin.length > 0
+                        ? [
+                            { id: 'ctx-restoreAll', label: t.restoreAll, run: function () { self.restoreAll(); } },
+                            { id: 'ctx-emptyTrash', label: t.emptyTrash, danger: true, run: function () { self.emptyTrash(); } }
+                          ]
+                        : [];
+                }
+                // all / ongoing
+                return this.leftTodosCount > 0
+                    ? [{ id: 'ctx-finishAll', label: t.finishAll, confirm: true, run: function () { self.doFinishAll(); } }]
+                    : [];
+            },
+            // Available actions filtered by the palette query.
+            paletteResults: function () {
+                return searchActions(this.actions, this.paletteQuery);
+            },
+            // The available sort modes, for the dedicated Sort menu.
+            sortActions: function () {
+                return searchActions(this.actions, '').filter(function (a) { return a.section === 'sort'; });
             }
         },
         methods: {
@@ -415,18 +576,21 @@
             // Add / complete
             addTodo: function () {
                 if (this.newTodoTitle === '') { this.checkEmpty = true; return; }
-                this.todos.unshift({ id: genId(), title: this.newTodoTitle, completed: false, removed: false });
+                this.todos.unshift({ id: genId(), title: this.newTodoTitle, completed: false, removed: false, createdAt: nextStamp() });
                 this.newTodoTitle = '';
                 this.checkEmpty = false;
                 this.delayTime = '0';
             },
             markAsCompleted: function (todo) { todo.completed = true; },
             markAsUncompleted: function (todo) { todo.completed = false; },
+            // Bare action — no prompt. The context bar guards it with an inline
+            // two-step confirm; the More menu / palette guard it with a modal.
+            doFinishAll: function () {
+                this.todos.forEach(function (todo) { if (!todo.completed) todo.completed = true; });
+            },
             markAllAsCompleted: function () {
                 var self = this;
-                confirm(this.t.confirmMarkAll).then(function (ok) {
-                    if (ok) self.todos.forEach(function (todo) { if (!todo.completed) todo.completed = true; });
-                });
+                confirm(this.t.confirmMarkAll).then(function (ok) { if (ok) self.doFinishAll(); });
             },
 
             // Remove / restore
@@ -479,11 +643,21 @@
                 });
             },
 
-            // Auto-sort (QOL-2): one-shot alphabetical sort of the active list
-            sortAZ: function () {
-                this.todos.sort(function (a, b) {
-                    return (a.title || '').localeCompare(b.title || '');
-                });
+            // One-shot reorder of the active list.
+            // modes: 'az' | 'za' | 'newest' | 'oldest' | 'random'.
+            // Reassigning todos keeps reactivity and persists via the watcher.
+            sortBy: function (mode) {
+                if (mode === 'random') {
+                    var a = this.todos.slice();
+                    for (var i = a.length - 1; i > 0; i--) {
+                        var j = Math.floor(Math.random() * (i + 1));
+                        var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+                    }
+                    this.todos = a;
+                } else {
+                    this.todos = sortTodos(this.todos, mode);
+                }
+                this.closeSort();
             },
 
             // ---- Export ----
@@ -681,7 +855,120 @@
             // Settings panel
             openSettings: function () { this.showSettings = true; },
             closeSettings: function () { this.showSettings = false; },
-            setTheme: function (name) { this.theme = name; }
+            setTheme: function (name) { this.theme = name; },
+
+            // ---- Trash bulk ops (used by the context bar) ----
+            restoreAll: function () {
+                var self = this;
+                this.recycleBin.slice().forEach(function (todo) {
+                    todo.removed = false;
+                    self.todos.push(todo);
+                });
+                this.recycleBin = [];
+                this.intention = 'all';
+            },
+            emptyTrash: function () {
+                var self = this;
+                confirm(this.t.confirmEmptyTrash).then(function (ok) {
+                    if (ok) { self.recycleBin = []; self.intention = 'all'; }
+                });
+            },
+
+            // ---- More menu + command palette ----
+            byId: function (id) {
+                var a = this.actions;
+                for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
+                return null;
+            },
+            openMore: function () { this.showMore = true; },
+            closeMore: function () { this.showMore = false; },
+            openSort: function () { this.showSort = true; },
+            closeSort: function () { this.showSort = false; },
+            runAction: function (a) {
+                this.closeMore();
+                this.closePalette();
+                this.closeSort();
+                if (a && typeof a.run === 'function') a.run();
+            },
+
+            // ---- Inline two-step confirm for prevalent destructive context actions ----
+            // Click once -> button counts down (disabled) -> 'Tap to confirm' -> runs.
+            contextLabel: function (a) {
+                if (this.confirmId !== a.id) return a.label;
+                return this.confirmCount > 0
+                    ? this.confirmCount + ''
+                    : this.t.confirmReady;
+            },
+            armConfirm: function (a) {
+                var self = this;
+                this.clearConfirm();
+                this.confirmId = a.id;
+                this.confirmCount = 3;
+                this._confirmTimer = setInterval(function () {
+                    self.confirmCount -= 1;
+                    if (self.confirmCount <= 0) {
+                        clearInterval(self._confirmTimer);
+                        self._confirmTimer = null;
+                        // Stay armed for a short grace window, then auto-cancel.
+                        self._confirmReset = setTimeout(function () { self.clearConfirm(); }, 6000);
+                    }
+                }, 1000);
+            },
+            clearConfirm: function () {
+                if (this._confirmTimer) { clearInterval(this._confirmTimer); this._confirmTimer = null; }
+                if (this._confirmReset) { clearTimeout(this._confirmReset); this._confirmReset = null; }
+                this.confirmId = null;
+                this.confirmCount = 0;
+            },
+            onContextClick: function (a) {
+                if (!a.confirm) { a.run(); return; }
+                if (this.confirmId === a.id) {
+                    if (this.confirmCount <= 0) {        // armed & ready -> go
+                        var run = a.run;
+                        this.clearConfirm();
+                        if (typeof run === 'function') run();
+                    }
+                    return;                              // still counting down -> ignore
+                }
+                this.armConfirm(a);
+            },
+            openPalette: function () {
+                this.paletteQuery = '';
+                this.paletteIndex = 0;
+                this.showPalette = true;
+                var self = this;
+                this.$nextTick(function () {
+                    if (self.$refs.paletteInput) self.$refs.paletteInput.focus();
+                });
+            },
+            closePalette: function () { this.showPalette = false; },
+            paletteMove: function (delta) {
+                var n = this.paletteResults.length;
+                if (!n) return;
+                this.paletteIndex = (this.paletteIndex + delta + n) % n;
+            },
+            paletteEnter: function () {
+                var a = this.paletteResults[this.paletteIndex];
+                if (a) this.runAction(a);
+            },
+            onKeydown: function (e) {
+                // Cmd/Ctrl+K toggles the palette from anywhere.
+                if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+                    e.preventDefault();
+                    if (this.showPalette) this.closePalette(); else this.openPalette();
+                    return;
+                }
+                if (e.key === 'Escape') {
+                    if (this.showPalette) { this.closePalette(); return; }
+                    if (this.showMore) { this.closeMore(); return; }
+                    if (this.showSort) { this.closeSort(); return; }
+                    if (this.confirmId) { this.clearConfirm(); return; }
+                }
+                if (!this.showPalette) return;
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.paletteMove(1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.paletteMove(-1); }
+                else if (e.key === 'Enter') { e.preventDefault(); this.paletteEnter(); }
+            }
         },
         directives: {
             focus: {
@@ -703,6 +990,11 @@
                 window.fullWidth = document.documentElement.clientWidth;
                 self.windowWidth = window.fullWidth;
             };
+            document.addEventListener('keydown', this.onKeydown);
+        },
+        beforeDestroy: function () {
+            document.removeEventListener('keydown', this.onKeydown);
+            this.clearConfirm();
         }
     });
 

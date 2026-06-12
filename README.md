@@ -54,7 +54,10 @@
 - ✔️ 所有提交操作支持Enter回车键提交
 - ✔️ 拖拽 Todo 上下移动可排序（电脑直接拖拽，手机长按后拖动）
 - ✔️ 双击上面的标语和 Todo 可进行编辑
-- ✔️ 右侧的小窗口是快捷操作哦
+- ✔️ 右侧栏：带数量的筛选标签 + 随当前视图变化的操作条
+- ↕️ **排序**：A–Z、Z–A、最新在前、最早在前、随机打乱（标签下方一键切换）
+- 🛟 「全部标为已完成」改为行内两步确认，避免误触
+- ⌨️ 其余操作收进「更多」菜单；按 **⌘K / Ctrl-K** 可呼出命令面板，搜索并执行任意操作
 - 🎨 内置多套主题（深色 / 复古棕 / 海洋 / 高对比 / 柔和 / 跟随系统），可在「设置」中切换
 - 🔒 所有的Todo数据存储在浏览器本地
 - 📝 支持下载/导入、复制/粘贴、批量添加；导入会自动去重，可用于跨设备手动同步（iCloud/Dropbox/网盘）
@@ -127,7 +130,10 @@ The personal information section is as follows:
 - ✔️ Press Enter to submit all actions
 - ✔️ Drag to reorder your to-dos (desktop drag, or long-press then drag on touch)
 - ✔️ Double-click to edit slogan and tasks
-- ✔️ Access quick actions in the right sidebar
+- ✔️ Right sidebar: filter tabs with counts + a context-aware action bar
+- ↕️ **Sort** by A–Z, Z–A, newest, oldest, or shuffle (one tap, under the tabs)
+- 🛟 Destructive "Finish all" asks for an inline two-step confirm (no accidental taps)
+- ⌨️ A **"More"** menu holds the rest; press **⌘K / Ctrl-K** for a command palette to search and run any action
 - 🎨 Built-in themes (Dark / Sepia / Ocean / High-Contrast / Pastel / Auto), switchable in **Settings**
 - 🔒 Your data is stored locally in your browser
 - 📝 Download/import, copy/paste, and bulk-add; imports are de-duplicated, so you can sync across devices manually (iCloud/Dropbox/Drive)
