@@ -119,7 +119,7 @@
                             appear="appear">
 
                             <li
-                                v-for='(todo, index) in filteredTodos'
+                                v-for='(todo, index) in displayTodos'
                                 :key='todo.id'
                                 class='todo-item'
                                 :class="{ 'touch-dragging': touchDragging && dragIndex === index }"
@@ -236,7 +236,7 @@
 
                             <!-- One-shot sort -->
                             <div class="sort-bar" v-if="todos.length > 1">
-                                <button type="button" class="sort-btn" @click="openSort">⇅ {{ t.sortBtn }}</button>
+                                <button type="button" class="sort-btn" @click="openSort">⇅ {{ currentSortLabel }}</button>
                             </div>
 
                             <!-- Context-aware bulk action(s) for the current view -->
@@ -320,8 +320,9 @@
                         </div>
                         <div class="more-section">
                             <button type="button" v-for="a in sortActions" :key="a.id"
-                                class="more-item" @click="runAction(a)">
+                                class="more-item" :class="{ active: a.mode === sortMode }" @click="runAction(a)">
                                 <span class="more-ico">{{ a.icon }}</span><span>{{ a.label }}</span>
+                                <span class="more-check" v-if="a.mode === sortMode">✓</span>
                             </button>
                         </div>
                     </div>

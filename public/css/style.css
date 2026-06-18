@@ -1882,6 +1882,16 @@ span.shortcut-name {
   background: var(--deleted);
 }
 
+.more-item.active {
+  background: var(--normal);
+  font-weight: 700;
+}
+
+.more-check {
+  margin-left: auto;
+  font-weight: 700;
+}
+
 .more-ico {
   width: 20px;
   text-align: center;

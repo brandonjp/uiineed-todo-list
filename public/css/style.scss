@@ -1615,6 +1615,8 @@ span.shortcut-name{
 .more-item:hover { background: var(--completed); }
 .more-item.danger { color: #d9483c; }
 .more-item.danger:hover { background: var(--deleted); }
+.more-item.active { background: var(--normal); font-weight: 700; }
+.more-check { margin-left: auto; font-weight: 700; }
 .more-ico { width: 20px; text-align: center; }
 .more-pair { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
 .more-pair-label { flex: 1 1 auto; font-size: 15px; color: var(--font-color); }
