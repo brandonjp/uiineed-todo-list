@@ -138,7 +138,7 @@ The personal information section is as follows:
 - 🔒 Your data is stored locally in your browser
 - 📝 Download/import, copy/paste, and bulk-add; imports are de-duplicated, so you can sync across devices manually (iCloud/Dropbox/Drive)
 
-> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.1.0).
+> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.5.0).
 
 ## Authors
 - Rico's Blog <a href="https://blog.ricocc.com/" target="_blank">@Ricocc</a>

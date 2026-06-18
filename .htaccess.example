@@ -1,0 +1,27 @@
+# Example hardening for a PRIVATE static deployment behind Apache.
+# Copy to ".htaccess" on your server and fill in YOUR_HOME. Your real .htaccess is
+# gitignored so deployment specifics (paths, hosts) never land in this public repo.
+
+# 1) Force HTTPS — Basic Auth credentials must never travel over plain HTTP.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# 2) Keep crawlers out at the header level (defense in depth w/ robots.txt + meta).
+<IfModule mod_headers.c>
+    Header set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet"
+</IfModule>
+
+# 3) HTTP Basic Auth — no anonymous access. AuthUserFile must be an ABSOLUTE path,
+#    ideally OUTSIDE the web root. Create it with:  htpasswd -cB <abs-path> <user>
+AuthType Basic
+AuthName "Restricted"
+AuthUserFile /home/YOUR_HOME/.htpasswd
+Require valid-user
+
+# 4) Never serve dotfiles (.htaccess, .htpasswd, .git, ...).
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

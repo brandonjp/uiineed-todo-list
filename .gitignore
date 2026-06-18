@@ -1,0 +1,11 @@
+# Deployment specifics & secrets must never land in this PUBLIC repo.
+.htpasswd
+# real .htaccess carries an absolute server path; commit .htaccess.example instead
+.htaccess
+# personal deploy notes (host, user, URL, etc.)
+DEPLOY.local.md
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp

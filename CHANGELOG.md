@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] — 2026-06-18
+
+Optional hardening for running the app as a **private** static deployment.
+
+### Added
+- **`robots.txt`** (`Disallow: /`) plus a `noindex, nofollow, noarchive, nosnippet,
+  noimageindex` `<meta name="robots">` in both `index.html` and `index-zh.html` —
+  keeps a private instance out of search indexes (defense in depth).
+- **`.htaccess.example`** — copy/paste Apache config to force HTTPS, send an
+  `X-Robots-Tag: noindex` header, and gate the whole site behind **HTTP Basic Auth**
+  (`Require valid-user`, no anonymous access). Your real `.htaccess` / `.htpasswd`
+  are git-ignored so deployment specifics never enter version control.
+
+### Notes
+- Todo data is still **per-browser `localStorage`** — never sent to a server — so
+  each browser/device keeps its own independent list. The Basic Auth example
+  controls who can *load the app*, not where data lives. (Cross-device sync is
+  tracked separately in `ROADMAP.md` §3.)
+
 ## [1.4.0] — 2026-06-12
 
 Sort reliability, a shuffle option, and theme-contrast fixes for the menu.

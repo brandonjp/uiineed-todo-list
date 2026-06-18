@@ -1,0 +1,5 @@
+# Private deployment — keep this out of all search indexes.
+# Advisory only (well-behaved crawlers obey it); real access control is the
+# HTTP Basic Auth in .htaccess, not this file.
+User-agent: *
+Disallow: /
