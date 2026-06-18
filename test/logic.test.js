@@ -246,6 +246,43 @@ test('sortTodos: returns the same todo references, reordered', function () {
     assert.strictEqual(out[1], a);
 });
 
+// ---- orderByRandom (random lens) ----------------------------------------
+test('orderByRandom: orders items by their position in the id list', function () {
+    var a = { id: 'a', title: 'A' }, b = { id: 'b', title: 'B' }, c = { id: 'c', title: 'C' };
+    var out = core.orderByRandom([a, b, c], ['b', 'c', 'a']);
+    assert.deepStrictEqual(out.map(function (t) { return t.id; }), ['b', 'c', 'a']);
+});
+test('orderByRandom: ids not in the order go to the TOP, keeping relative order', function () {
+    var a = { id: 'a' }, b = { id: 'b' }, c = { id: 'c' }, d = { id: 'd' };
+    // order knows only b,c,a; d is new (added after the shuffle)
+    var out = core.orderByRandom([a, b, c, d], ['b', 'c', 'a']);
+    assert.deepStrictEqual(out.map(function (t) { return t.id; }), ['d', 'b', 'c', 'a']);
+});
+test('orderByRandom: multiple new ids keep their relative (input) order at the top', function () {
+    var a = { id: 'a' }, b = { id: 'b' }, x = { id: 'x' }, y = { id: 'y' };
+    var out = core.orderByRandom([x, a, y, b], ['b', 'a']);
+    assert.deepStrictEqual(out.map(function (t) { return t.id; }), ['x', 'y', 'b', 'a']);
+});
+test('orderByRandom: ids in order but absent from list are ignored', function () {
+    var a = { id: 'a' }, b = { id: 'b' };
+    var out = core.orderByRandom([a, b], ['b', 'gone', 'a']);
+    assert.deepStrictEqual(out.map(function (t) { return t.id; }), ['b', 'a']);
+});
+test('orderByRandom: empty order -> input order unchanged', function () {
+    var a = { id: 'a' }, b = { id: 'b' };
+    assert.deepStrictEqual(core.orderByRandom([a, b], []).map(function (t) { return t.id; }), ['a', 'b']);
+});
+test('orderByRandom: returns same todo references', function () {
+    var a = { id: 'a' }, b = { id: 'b' };
+    var out = core.orderByRandom([a, b], ['b', 'a']);
+    assert.strictEqual(out[0], b);
+    assert.strictEqual(out[1], a);
+});
+test('shuffleIds: returns a permutation of the input ids', function () {
+    var ids = core.shuffleIds([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+    assert.deepStrictEqual(ids.slice().sort(), ['a', 'b', 'c']);
+});
+
 // ---- planSync: the cross-device last-write-wins decision -----------------
 // planSync(local, remote) decides what a device should do when it sees the
 // remote blob. local = { updatedAt, hasData, synced }; remote = parsed blob

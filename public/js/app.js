@@ -260,6 +260,33 @@
         return decorated.map(function (x) { return x.todo; });
     }
 
+    // Random "view" lens: order `list` by each item's index in `order` (an
+    // array of todo ids rolled once at shuffle time). Ids missing from `order`
+    // (e.g. a task added after the shuffle) sort to the TOP, keeping their
+    // relative order — matching the app's "newest at top" add convention. Ids
+    // in `order` but no longer present are ignored. Returns a NEW array of the
+    // same todo references.
+    function orderByRandom(list, order) {
+        var pos = {}, ord = order || [], i;
+        for (i = 0; i < ord.length; i++) pos[ord[i]] = i;
+        return (list || []).map(function (todo, idx) {
+            var p = pos[todo && todo.id];
+            return { todo: todo, idx: idx, key: (p == null ? -1 : p) };
+        }).sort(function (a, b) {
+            return (a.key - b.key) || (a.idx - b.idx);
+        }).map(function (x) { return x.todo; });
+    }
+
+    // Fisher–Yates shuffle of the todos' ids -> a fresh randomOrder array.
+    function shuffleIds(todos) {
+        var ids = (todos || []).map(function (t) { return t && t.id; });
+        for (var i = ids.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = ids[i]; ids[i] = ids[j]; ids[j] = tmp;
+        }
+        return ids;
+    }
+
     // Backfill a stable createdAt on items that lack one, so newest/oldest work
     // for legacy todos whose ids predate the timestamped-id scheme. Uses the id
     // timestamp when parseable; otherwise a synthetic stamp placed below all
@@ -303,7 +330,9 @@
             fuzzyMatch: fuzzyMatch,
             searchActions: searchActions,
             idTime: idTime,
-            sortTodos: sortTodos
+            sortTodos: sortTodos,
+            orderByRandom: orderByRandom,
+            shuffleIds: shuffleIds
         };
         return;
     }
