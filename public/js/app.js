@@ -515,6 +515,7 @@
                 checkEmpty: false,
                 recycleBin: initial.recycle,
                 dragIndex: null,
+                dragOverIndex: null,
                 enterIndex: '',
                 show: true,
                 delayTime: '1',
@@ -1107,16 +1108,40 @@
                 this.todos.splice(to, 0, src);
             },
 
-            // Desktop HTML5 drag-and-drop
-            dragstart: function (index) { this.dragIndex = index; },
-            dragenter: function (e, index) {
-                e.preventDefault();
-                if (this.dragIndex !== index) {
-                    this.moveItem(this.dragIndex, index);
-                    this.dragIndex = index;
+            // Bake the current VISIBLE order into the manual order and switch to
+            // it. Called at drag start so the rendered indices line up 1:1 with
+            // this.todos before any move. Order is unchanged at this instant
+            // (displayTodos === the rendered list), so no DOM node moves and the
+            // native drag is not disturbed. 'all'-view only (drag is too).
+            bakeManualOrder: function () {
+                if (this.intention !== 'all') return;
+                if (this.sortMode !== 'custom') {
+                    this.todos = this.displayTodos.slice();
+                    this.sortMode = 'custom';
                 }
             },
-            dragover: function (e) { e.preventDefault(); },
+
+            // Desktop HTML5 drag-and-drop.
+            // We do NOT splice the list during the drag: moving the dragged <li>
+            // in the DOM (as live reorder + the keyed transition-group's FLIP did)
+            // aborts the native drag. Instead we track the hovered index and
+            // commit the move once, on dragend.
+            dragstart: function (index) {
+                if (this.intention !== 'all') return;
+                this.bakeManualOrder();
+                this.dragIndex = index;
+                this.dragOverIndex = index;
+            },
+            dragenter: function (e, index) {
+                e.preventDefault();
+                this.dragOverIndex = index; // track only; no list mutation mid-drag
+            },
+            dragover: function (e) { e.preventDefault(); }, // mark a valid drop target
+            dragend: function () {
+                this.moveItem(this.dragIndex, this.dragOverIndex); // single commit
+                this.dragIndex = null;
+                this.dragOverIndex = null;
+            },
 
             // Touch drag (mobile): long-press to pick up, then drag to reorder.
             // Long-press avoids fighting with normal list scrolling — a quick
@@ -1130,7 +1155,10 @@
                 this.touchStartY = touch.clientY;
                 var self = this;
                 clearTimeout(this.touchTimer);
-                this.touchTimer = setTimeout(function () { self.touchDragging = true; }, 280);
+                this.touchTimer = setTimeout(function () {
+                    self.bakeManualOrder(); // order unchanged; dragIndex still valid
+                    self.touchDragging = true;
+                }, 280);
             },
             touchMoveItem: function (e) {
                 var touch = e.touches && e.touches[0];
