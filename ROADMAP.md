@@ -107,6 +107,15 @@ acceptable. We must NOT turn this into a login-required, server-heavy product.
 > requirement either way: **import must detect and dedupe** so re-importing the same export
 > doesn't create duplicates.
 
+> **Update (2026-06-18, v1.6.0):** Shipped a **same-origin `sync.php`** — an even
+> simpler variant of Option A. Because the private deployment already sits behind HTTP
+> Basic Auth (v1.5.0), the backend needs no auth/"Sync ID" of its own: it stores ONE
+> JSON blob outside the web root and the client reconciles by **blob-level
+> last-write-wins** (`planSync()`), with a safe union on first contact. Fully opt-in —
+> absent `sync.php`, the app stays local-only. See [`docs/SYNC.md`](./docs/SYNC.md). The
+> hosted Cloudflare Worker + KV "Sync ID" (below) remains the documented path for a
+> *public* (no-Basic-Auth) deployment.
+
 ### Chosen approach — Option C: file / clipboard sync via a cloud drive
 
 - Lean on the improved export/import (Section 5): export to clipboard or file, drop the file

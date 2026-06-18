@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.5.0';
+    var APP_VERSION = '1.6.0';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -29,6 +29,8 @@
     var FILTER_KEY = 'uiineed-filter';
     var SLOGAN_KEY = 'uiineed-slogan';
     var SETTINGS_KEY = 'uiineed-settings';
+    var SYNC_KEY = 'uiineed-sync';          // local sync meta: { updatedAt, synced }
+    var SYNC_ENDPOINT = 'sync.php';         // SAME-ORIGIN, relative — never hardcode a host
 
     // ---- Settings + theme ---------------------------------------------------
     var THEMES = ['classic', 'dark', 'sepia', 'ocean', 'contrast', 'pastel', 'auto'];
@@ -120,6 +122,35 @@
     var recycleStorage = {
         save: function (items) { safeSet(RECYCLE_KEY, JSON.stringify(items)); }
     };
+
+    // ---- Sync meta (local bookkeeping for cross-device sync) ----------------
+    // updatedAt: logical timestamp of the current local data version (bumped on
+    // every local change). synced: have we ever reconciled with the backend on
+    // this device (controls the safe first-contact union — see planSync).
+    function loadSyncMeta() {
+        try {
+            var s = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+            return {
+                updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : 0,
+                synced: !!s.synced
+            };
+        } catch (e) {
+            return { updatedAt: 0, synced: false };
+        }
+    }
+    function saveSyncMeta(m) { safeSet(SYNC_KEY, JSON.stringify(m)); }
+
+    // Coerce a remote list into clean todos, preserving createdAt (so newest/
+    // oldest sort still works after a pull) and backfilling any that lack one.
+    function sanitizeRemoteList(arr) {
+        var out = (Array.isArray(arr) ? arr : []).map(function (it) {
+            var c = coerce(it);
+            if (it && typeof it.createdAt === 'number') c.createdAt = it.createdAt;
+            return c;
+        });
+        backfillCreatedAt(out);
+        return out;
+    }
 
     // ---- Custom dialogs (SEC-1: text set via textContent, never innerHTML) --
     function buildDialog(message, opts) {
@@ -263,6 +294,7 @@
             parseRecycle: parseRecycle,
             normKey: normKey,
             mergeImport: mergeImport,
+            planSync: planSync,
             genId: genId,
             fuzzyMatch: fuzzyMatch,
             searchActions: searchActions,
@@ -374,9 +406,37 @@
         return { added: added, updated: updated, skipped: skipped };
     }
 
+    // ---- Cross-device sync reconcile (last-write-wins) ----------------------
+    // Decide what this device should do when it sees the remote blob. Pure and
+    // testable; the Vue layer carries out the chosen action.
+    //   local  = { updatedAt:Number, hasData:Boolean, synced:Boolean }
+    //   remote = parsed blob object, or null/garbage (treated as "no remote")
+    //
+    // Blob-level LAST-WRITE-WINS — the deliberately "rudimentary" model: the
+    // newer whole snapshot wins, so deletions propagate too (a per-item merge
+    // would resurrect items deleted on the other device). The ONE exception is
+    // FIRST CONTACT on a device (synced=false) with a non-empty remote: we
+    // union via the tested mergeImport path so a device's pre-sync todos are
+    // never silently clobbered the first time it connects. After that, pure LWW.
+    function planSync(local, remote) {
+        local = local || {};
+        var localAt = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
+        var remoteAt = (remote && typeof remote.updatedAt === 'number') ? remote.updatedAt : 0;
+        var remoteHasData = !!(remote && (
+            (Array.isArray(remote.todos) && remote.todos.length) ||
+            (Array.isArray(remote.recycleBin) && remote.recycleBin.length)
+        ));
+        if (!remoteHasData) return { action: local.hasData ? 'push' : 'none' };
+        if (!local.synced) return { action: 'merge' };
+        if (remoteAt > localAt) return { action: 'pull' };
+        if (localAt > remoteAt) return { action: 'push' };
+        return { action: 'none' };
+    }
+
     // ---- Vue instance -------------------------------------------------------
     var initial = loadState();
     var settings = loadSettings();
+    var syncMeta = loadSyncMeta();
     applyTheme(settings.theme); // apply before mount to avoid a flash
 
     var app = new Vue({
@@ -418,16 +478,23 @@
                 paletteIndex: 0,
                 showSort: false,
                 confirmId: null,
-                confirmCount: 0
+                confirmCount: 0,
+                // ---- Cross-device sync (optional same-origin backend) ----
+                syncUpdatedAt: syncMeta.updatedAt, // logical version of local data
+                syncSynced: syncMeta.synced,       // have we reconciled before?
+                syncAvailable: null,               // null=unknown, true/false after probe
+                syncStatus: 'idle',                // idle|syncing|synced|offline|error
+                syncLastAt: 0,                     // wall-clock of last successful sync
+                showSyncStatus: false              // reveal the status row once relevant
             };
         },
         watch: {
             todos: {
-                handler: function (todos) { todoStorage.save(todos); },
+                handler: function (todos) { todoStorage.save(todos); this.touchData(); },
                 deep: true
             },
             recycleBin: {
-                handler: function (items) { recycleStorage.save(items); },
+                handler: function (items) { recycleStorage.save(items); this.touchData(); },
                 deep: true
             },
             intention: function (val) { safeSet(FILTER_KEY, val); this.clearConfirm(); },
@@ -439,6 +506,19 @@
         },
         computed: {
             t: function () { return I18N[this.lang] || I18N.en || {}; },
+            // Short, localized label for the sync status row.
+            syncStatusText: function () {
+                var t = this.t;
+                if (this.syncStatus === 'synced') {
+                    if (this.syncLastAt) {
+                        var time = new Date(this.syncLastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return this.tf('syncSyncedAt', { time: time });
+                    }
+                    return t.syncSynced;
+                }
+                var map = { idle: t.syncIdle, syncing: t.syncSyncing, offline: t.syncOffline, error: t.syncError };
+                return map[this.syncStatus] || t.syncIdle;
+            },
             emptyChecked: function () {
                 return this.newTodoTitle.length === 0 && this.checkEmpty;
             },
@@ -486,6 +566,7 @@
                     { id: 'copy',           label: t.copyClipboard,    icon: '⧉',  section: 'data',     when: true,                          run: function () { self.copyToClipboard(); } },
                     { id: 'importFile',     label: t.importFile,       icon: '⤒',  section: 'data',     when: true,                          run: function () { self.importFile(); } },
                     { id: 'paste',          label: t.pasteClipboard,   icon: '⎘',  section: 'data',     when: true,                          run: function () { self.pasteFromClipboard(); } },
+                    { id: 'sync',           label: t.syncNow,          icon: '⟲',  section: 'app',      when: true,                          run: function () { self.syncNow(); } },
                     { id: 'settings',       label: t.settings,         icon: '⚙',  section: 'app',      when: true,                          run: function () { self.openSettings(); } },
                     { id: 'reload',         label: t.reload,           icon: '⟳',  section: 'app',      when: true,                          run: function () { location.reload(); } }
                 ];
@@ -554,6 +635,7 @@
             saveText: function () {
                 this.isEditing = false;
                 safeSet(SLOGAN_KEY, this.slogan);
+                this.touchData();
             },
             cancelText: function () {
                 this.slogan = this.originalSlogan;
@@ -659,6 +741,171 @@
                 }
                 this.closeSort();
             },
+
+            // ---- Cross-device sync (optional same-origin PHP backend) ------
+            // The whole flow degrades gracefully: if sync.php is missing or
+            // unreachable (static host, file://, no PHP), the app keeps working
+            // on localStorage alone and never shows a blocking error.
+
+            // Called by the data watchers / slogan save on any LOCAL change.
+            // Bumps the local sync clock and schedules a debounced push. Skipped
+            // while we're applying a remote snapshot (that isn't a local edit).
+            touchData: function () {
+                if (this._applyingRemote) return;
+                this.syncUpdatedAt = nextStamp();
+                saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: this.syncSynced });
+                this.scheduleSyncPush();
+            },
+            scheduleSyncPush: function () {
+                if (this.syncAvailable !== true) return; // unknown/offline -> stay local-only
+                var self = this;
+                clearTimeout(this._syncPushTimer);
+                this._syncPushTimer = setTimeout(function () { self.pushSync(); }, 1500);
+            },
+
+            buildSyncPayload: function () {
+                return {
+                    version: 1,
+                    updatedAt: this.syncUpdatedAt,
+                    slogan: this.slogan,
+                    todos: this.todos,
+                    recycleBin: this.recycleBin
+                };
+            },
+
+            // Low-level fetches. Same-origin + credentials so the browser
+            // auto-sends the Basic Auth header that gates the whole site.
+            syncGet: function () {
+                return fetch(SYNC_ENDPOINT, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store',
+                    credentials: 'same-origin'
+                }).then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                });
+            },
+            syncPut: function (payload) {
+                return fetch(SYNC_ENDPOINT, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    cache: 'no-store',
+                    credentials: 'same-origin'
+                }).then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                });
+            },
+
+            // Best-effort upload of the current local state.
+            pushSync: function () {
+                if (this.syncAvailable !== true) return Promise.resolve();
+                var self = this;
+                this.syncStatus = 'syncing';
+                return this.syncPut(this.buildSyncPayload()).then(function () {
+                    self.syncSynced = true;
+                    self.syncLastAt = Date.now();
+                    self.syncStatus = 'synced';
+                    saveSyncMeta({ updatedAt: self.syncUpdatedAt, synced: true });
+                }).catch(function () {
+                    // Endpoint went away mid-session: stop auto-pushing until the
+                    // user explicitly retries via "Sync now".
+                    self.syncAvailable = false;
+                    self.syncStatus = 'error';
+                });
+            },
+
+            // Adopt the remote snapshot wholesale (blob last-write-wins on pull).
+            applyRemote: function (remote) {
+                var self = this;
+                this._applyingRemote = true; // suppress touchData for these writes
+                var todos = sanitizeRemoteList(remote.todos);
+                var recycle = sanitizeRemoteList(remote.recycleBin);
+                recycle.forEach(function (t) { t.removed = true; });
+                if (typeof remote.slogan === 'string' && remote.slogan) {
+                    this.slogan = remote.slogan;
+                    safeSet(SLOGAN_KEY, remote.slogan);
+                }
+                this.todos = todos;
+                this.recycleBin = recycle;
+                this.syncUpdatedAt = (typeof remote.updatedAt === 'number') ? remote.updatedAt : nextStamp();
+                this.syncSynced = true;
+                saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: true });
+                this.$nextTick(function () { self._applyingRemote = false; });
+            },
+
+            // First contact on this device: union local + remote (no data loss),
+            // then push the union up so other devices converge on it.
+            mergeRemote: function (remote) {
+                var self = this;
+                this._applyingRemote = true; // we drive the push explicitly below
+                var todos = sanitizeRemoteList(remote.todos);
+                var recycle = sanitizeRemoteList(remote.recycleBin);
+                mergeImport(this.todos, todos);
+                if (recycle.length) {
+                    mergeImport(this.recycleBin, recycle);
+                    this.recycleBin.forEach(function (t) { t.removed = true; });
+                }
+                this.syncUpdatedAt = nextStamp(); // union is a new version, newer than remote
+                this.syncSynced = true;
+                saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: true });
+                this.$nextTick(function () { self._applyingRemote = false; });
+                return this.pushSync();
+            },
+
+            // Fetch the remote blob and act on the planSync decision.
+            runSync: function (opts) {
+                var self = this;
+                var silent = opts && opts.silent;
+                // No fetch (very old browser / odd host) -> behave like "offline".
+                if (typeof fetch !== 'function') {
+                    this.syncAvailable = false;
+                    if (!silent) { this.showSyncStatus = true; this.syncStatus = 'offline'; }
+                    return Promise.resolve();
+                }
+                if (!silent) { this.showSyncStatus = true; this.syncStatus = 'syncing'; }
+                return this.syncGet().then(function (remote) {
+                    self.syncAvailable = true;
+                    self.showSyncStatus = true;
+                    var plan = planSync({
+                        updatedAt: self.syncUpdatedAt,
+                        hasData: !!(self.todos.length || self.recycleBin.length),
+                        synced: self.syncSynced
+                    }, remote);
+                    if (plan.action === 'pull') {
+                        self.applyRemote(remote);
+                        self.syncLastAt = Date.now();
+                        self.syncStatus = 'synced';
+                    } else if (plan.action === 'merge') {
+                        return self.mergeRemote(remote).then(function () { self.syncLastAt = Date.now(); });
+                    } else if (plan.action === 'push') {
+                        // Seeding an empty remote: stamp a real version first so
+                        // cross-device ordering starts from a meaningful timestamp.
+                        if (!self.syncUpdatedAt) {
+                            self.syncUpdatedAt = nextStamp();
+                            saveSyncMeta({ updatedAt: self.syncUpdatedAt, synced: self.syncSynced });
+                        }
+                        return self.pushSync();
+                    } else { // none — already in sync
+                        self.syncSynced = true;
+                        saveSyncMeta({ updatedAt: self.syncUpdatedAt, synced: true });
+                        self.syncLastAt = Date.now();
+                        self.syncStatus = 'synced';
+                    }
+                }).catch(function () {
+                    self.syncAvailable = false;
+                    if (!silent) { self.showSyncStatus = true; self.syncStatus = 'offline'; }
+                });
+            },
+
+            // User-triggered (status row, More menu, ⌘K palette).
+            syncNow: function () { this.runSync({ silent: false }); },
+
+            // Silent probe on load: detect the backend, then reconcile. No UI
+            // noise if it isn't there.
+            initSync: function () { this.runSync({ silent: true }); },
 
             // ---- Export ----
             buildPayload: function () {
@@ -977,6 +1224,7 @@
         },
         mounted: function () {
             this.show = true;
+            this._applyingRemote = false;
             var self = this;
             // If the restored filter has nothing to show, fall back to "all"
             var counts = {
@@ -991,10 +1239,12 @@
                 self.windowWidth = window.fullWidth;
             };
             document.addEventListener('keydown', this.onKeydown);
+            this.initSync(); // probe the optional sync backend and reconcile
         },
         beforeDestroy: function () {
             document.removeEventListener('keydown', this.onKeydown);
             this.clearConfirm();
+            clearTimeout(this._syncPushTimer);
         }
     });
 

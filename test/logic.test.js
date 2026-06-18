@@ -216,4 +216,44 @@ test('sortTodos: returns the same todo references, reordered', function () {
     assert.strictEqual(out[1], a);
 });
 
+// ---- planSync: the cross-device last-write-wins decision -----------------
+// planSync(local, remote) decides what a device should do when it sees the
+// remote blob. local = { updatedAt, hasData, synced }; remote = parsed blob
+// (or null/garbage). Returns { action: 'push' | 'pull' | 'merge' | 'none' }.
+//   push  -> our local copy is authoritative; upload it.
+//   pull  -> remote is newer; adopt it wholesale (blob last-write-wins).
+//   merge -> first contact on this device with a non-empty remote; union both
+//            (via the tested mergeImport path) so no offline work is lost.
+//   none  -> nothing to do.
+test('planSync: empty remote + local has data -> push (seed remote)', function () {
+    assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: false }, null).action, 'push');
+    assert.strictEqual(core.planSync({ updatedAt: 0, hasData: true, synced: false },
+        { updatedAt: 0, todos: [], recycleBin: [] }).action, 'push');
+});
+test('planSync: empty remote + local empty -> none', function () {
+    assert.strictEqual(core.planSync({ updatedAt: 0, hasData: false, synced: false }, null).action, 'none');
+});
+test('planSync: first contact with a non-empty remote -> merge (no data loss)', function () {
+    var r = { updatedAt: 100, todos: [{ id: 'a1', title: 'X' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 0, hasData: false, synced: false }, r).action, 'merge');
+    // even if our local clock looks "newer", an un-synced device must union, not clobber
+    assert.strictEqual(core.planSync({ updatedAt: 999, hasData: true, synced: false }, r).action, 'merge');
+});
+test('planSync: synced + remote newer -> pull', function () {
+    var r = { updatedAt: 200, todos: [{ id: 'a1', title: 'X' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 100, hasData: true, synced: true }, r).action, 'pull');
+});
+test('planSync: synced + local newer -> push', function () {
+    var r = { updatedAt: 100, todos: [{ id: 'a1', title: 'X' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 200, hasData: true, synced: true }, r).action, 'push');
+});
+test('planSync: synced + equal timestamps -> none', function () {
+    var r = { updatedAt: 150, todos: [{ id: 'a1', title: 'X' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 150, hasData: true, synced: true }, r).action, 'none');
+});
+test('planSync: garbage/non-object remote is treated as no data', function () {
+    assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: true }, 123).action, 'push');
+    assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: true }, undefined).action, 'push');
+});
+
 console.log('\nAll ' + passed + ' tests passed.');

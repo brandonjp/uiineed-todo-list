@@ -131,6 +131,15 @@ window.I18N = {
         sortOldest: 'Oldest first',
         sortRandom: 'Shuffle',
 
+        // Cross-device sync
+        syncNow: 'Sync now',
+        syncIdle: 'Not synced',
+        syncSyncing: 'Syncing…',
+        syncSynced: 'Synced',
+        syncSyncedAt: 'Synced {time}',
+        syncOffline: 'Sync unavailable',
+        syncError: 'Sync failed',
+
         defaultSlogan: 'Act Now, Simplify Life.☕'
     },
 
@@ -255,6 +264,15 @@ window.I18N = {
         sortNewest: '最新在前',
         sortOldest: '最早在前',
         sortRandom: '随机打乱',
+
+        // 跨设备同步
+        syncNow: '立即同步',
+        syncIdle: '尚未同步',
+        syncSyncing: '同步中…',
+        syncSynced: '已同步',
+        syncSyncedAt: '已同步 {time}',
+        syncOffline: '同步不可用',
+        syncError: '同步失败',
 
         defaultSlogan: '立即行动，简化生活。☕'
     }

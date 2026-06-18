@@ -4,6 +4,38 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-06-18
+
+Optional **cross-device sync** for private deployments, via a tiny same-origin
+PHP backend. Fully opt-in: if the backend isn't present, the app behaves exactly
+as before (per-browser `localStorage`, no errors).
+
+### Added
+- **`sync.php`** — a same-origin endpoint that stores ONE JSON snapshot (todos +
+  recycle bin + slogan + an `updatedAt` stamp) in a file kept **outside the web
+  root**. `GET` returns the blob; `PUT`/`POST` validates it is a JSON object and
+  writes it atomically (temp file + `rename`, `LOCK_EX`), with a 5 MB cap. It
+  carries **no auth code on purpose** — the site's existing HTTP Basic Auth gates
+  every request, and the storage path is a fixed server-side constant (no
+  path-traversal vector). Generic and host-agnostic, safe for the public repo.
+- **Client sync** in `public/js/app.js`: on load it silently probes `sync.php` and
+  reconciles; on every change it debounces a `PUT`. Reconciliation is **blob-level
+  last-write-wins** by `updatedAt` (`planSync()`), so deletions propagate. The one
+  exception is **first contact** on a device — it unions local + remote (via the
+  existing tested `mergeImport`) so nothing is lost the first time you connect.
+- **"Sync now"** action wired through the existing `actions` registry, so it shows
+  up in the **⌘K command palette** and the **More** menu, plus a clickable
+  **sync-status indicator** (last-synced time / syncing / offline) in the sidebar.
+- New i18n strings (EN + ZH) for the sync UI; `uiineed-sync` localStorage key for
+  the local sync bookkeeping (`updatedAt` + `synced`).
+
+### Notes
+- **Graceful degradation:** with no `sync.php` (static host, `file://`, no PHP) the
+  silent probe simply fails and the app stays 100% local — the status row stays
+  hidden until you explicitly trigger a sync.
+- Last-write-wins is deliberately **rudimentary** (no per-item merge): refreshing
+  on another device pulls the latest snapshot. See `ROADMAP.md` §3.
+
 ## [1.5.0] — 2026-06-18
 
 Optional hardening for running the app as a **private** static deployment.

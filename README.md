@@ -137,8 +137,12 @@ The personal information section is as follows:
 - 🎨 Built-in themes (Dark / Sepia / Ocean / High-Contrast / Pastel / Auto), switchable in **Settings**
 - 🔒 Your data is stored locally in your browser
 - 📝 Download/import, copy/paste, and bulk-add; imports are de-duplicated, so you can sync across devices manually (iCloud/Dropbox/Drive)
+- 🔄 **Optional cross-device sync** (`sync.php`): drop the included same-origin PHP
+  endpoint on a PHP host behind your own auth and the app keeps every device in
+  sync automatically (blob-level last-write-wins, refresh to pull). Leave it out and
+  nothing changes — the app stays 100% local. See [`docs/SYNC.md`](./docs/SYNC.md).
 
-> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.5.0).
+> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.6.0).
 
 ## Authors
 - Rico's Blog <a href="https://blog.ricocc.com/" target="_blank">@Ricocc</a>

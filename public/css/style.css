@@ -2023,3 +2023,42 @@ span.shortcut-name {
     transform: translate(-1px, -1px);
   }
 }
+
+/* Sync status (optional cross-device sync) */
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 10px;
+  padding: 7px 12px;
+  border: var(--border);
+  border-radius: var(--border-radius);
+  background: var(--bg-normal);
+  color: var(--font-color);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.sync-status:hover {
+  box-shadow: var(--box-shadow);
+  transform: translate(-1px, -1px);
+}
+.sync-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--font-color);
+  background: #bbbbbb;
+}
+.sync-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sync-status.sync-syncing .sync-dot { background: #f5d99e; }
+.sync-status.sync-synced .sync-dot { background: #57c98a; }
+.sync-status.sync-offline .sync-dot { background: #bbbbbb; }
+.sync-status.sync-error .sync-dot { background: #ff8b7e; }

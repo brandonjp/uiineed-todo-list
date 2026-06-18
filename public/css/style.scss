@@ -1710,3 +1710,41 @@ span.shortcut-name{
     0%, 100% { transform: translate(0, 0); }
     50% { transform: translate(-1px, -1px); }
 }
+/* Sync status (optional cross-device sync) */
+.sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 10px 10px;
+    padding: 7px 12px;
+    border: var(--border);
+    border-radius: var(--border-radius);
+    background: var(--bg-normal);
+    color: var(--font-color);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    &:hover {
+        box-shadow: var(--box-shadow);
+        transform: translate(-1px, -1px);
+    }
+    &.sync-syncing .sync-dot { background: #f5d99e; }
+    &.sync-synced .sync-dot { background: #57c98a; }
+    &.sync-offline .sync-dot { background: #bbbbbb; }
+    &.sync-error .sync-dot { background: #ff8b7e; }
+}
+.sync-dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid var(--font-color);
+    background: #bbbbbb;
+}
+.sync-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

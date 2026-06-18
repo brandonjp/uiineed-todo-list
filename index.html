@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="version" content="1.5.0">
+        <meta name="version" content="1.6.0">
         <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
         <title>Todo List Online - Minimalist, No-Login Required Web Todo App</title>
         <meta
@@ -251,6 +251,13 @@
                             <div class="todo-actions-foot">
                                 <button type="button" class="more-btn" @click="openMore">⋯ {{ t.moreBtn }}</button>
                                 <button type="button" class="palette-btn" @click="openPalette" :title="t.paletteTitle">{{ t.paletteShortcut }}</button>
+                            </div>
+
+                            <!-- Sync status (optional cross-device sync) -->
+                            <div class="sync-status" v-if="showSyncStatus" :class="'sync-' + syncStatus"
+                                @click="syncNow" role="button" tabindex="0" :title="t.syncNow">
+                                <span class="sync-dot"></span>
+                                <span class="sync-text">{{ syncStatusText }}</span>
                             </div>
 
                         </div>
