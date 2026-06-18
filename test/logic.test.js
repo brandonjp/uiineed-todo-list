@@ -133,6 +133,23 @@ test('mergeImport: new items land in front of existing ones, in file order', fun
     assert.deepStrictEqual(target.map(function (t) { return t.title; }),
         ['New A', 'New B', 'Existing']);
 });
+test('mergeImport: dispatches through the array\'s OWN unshift (Vue reactivity)', function () {
+    // Regression for the import/sync data-loss bug: Vue 2 makes an observed
+    // array reactive by replacing its mutation methods (unshift/push/splice/...)
+    // with interceptors that notify watchers. Calling Array.prototype.unshift
+    // directly BYPASSES that interceptor — imported items land in the array but
+    // Vue never fires, so the filter counts go stale and the deep watcher never
+    // persists to localStorage (the import vanishes on the next refresh). This
+    // spy mimics Vue's interceptor and asserts mergeImport routes through it.
+    var target = [];
+    var intercepted = 0;
+    var nativeUnshift = Array.prototype.unshift;
+    target.unshift = function () { intercepted++; return nativeUnshift.apply(this, arguments); };
+    core.mergeImport(target, [{ title: 'A' }, { title: 'B' }]);
+    assert.ok(intercepted > 0,
+        'mergeImport must call the array\'s own unshift, not Array.prototype.unshift');
+    assert.deepStrictEqual(target.map(function (t) { return t.title; }), ['A', 'B']);
+});
 test('mergeImport: two-device round trip converges (A->B->A, no growth)', function () {
     // Device A starts with two items.
     var A = [];

@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.6.3';
+    var APP_VERSION = '1.6.4';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -411,7 +411,14 @@
             byKey[normKey(nt)] = nt;
             added.push(nt);
         });
-        Array.prototype.unshift.apply(targetList, added);
+        // Use the array's OWN unshift, not Array.prototype.unshift: when targetList
+        // is a Vue-observed array (this.todos / this.recycleBin), Vue 2 replaces its
+        // mutation methods with reactive interceptors. Calling Array.prototype.unshift
+        // directly bypasses that interceptor, so the items land in the array but Vue
+        // is never notified — computed counts (completed/ongoing) go stale and the
+        // deep watcher never persists to localStorage (import looks fine, then a
+        // refresh wipes it). Dispatching through targetList.unshift keeps it reactive.
+        if (added.length) targetList.unshift.apply(targetList, added);
         return { added: added.length, updated: updated, skipped: skipped };
     }
 

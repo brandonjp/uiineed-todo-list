@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.4] — 2026-06-18
+
+### Fixed
+- **Imported todos no longer vanish on refresh, and the filter counts (All /
+  In Progress / Completed) update correctly after an import or first-device
+  sync.** `mergeImport()` appended new items with `Array.prototype.unshift.apply(
+  targetList, added)`, which calls the *native* `unshift` and bypasses Vue 2's
+  reactive array interceptor on `this.todos` / `this.recycleBin`. The items
+  landed in the array (so they rendered), but Vue was never notified — so the
+  computed tab counts stayed frozen at their pre-import values (e.g. *All 41 /
+  In Progress 0 / Completed 0*), **and** the deep `todos` watcher never fired, so
+  the import was never written to `localStorage`. The data lived only in memory:
+  a page refresh reloaded the empty stored list and the import appeared to "wipe
+  itself out" — the same path also affected first-contact cross-device sync
+  (`mergeRemote`). Fixed by dispatching through the array's own (Vue-patched)
+  `unshift` (`targetList.unshift.apply(targetList, added)`), restoring reactivity,
+  live counts, and persistence. Regression test added (a spy proves `mergeImport`
+  routes through the instance method, not `Array.prototype`). Introduced in 1.6.1.
+
+### Changed
+- **Cache-busting on app assets.** `app.js`, `i18n.js`, and `style.min.css` are
+  now referenced with a `?v=1.6.4` query string in `index.html` / `index-zh.html`
+  (and the stale `<meta name="version">` updated from `1.6.0` → `1.6.4`). The
+  deployment sets no explicit cache headers, so browsers were heuristically
+  caching the JS — devices could keep running an old `app.js` after a deploy.
+  Bumping the query on each release forces a fresh fetch so fixes actually land.
+
 ## [1.6.3] — 2026-06-18
 
 ### Fixed
