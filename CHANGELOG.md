@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.2] — 2026-06-18
+
+### Fixed
+- **Alert/confirm dialogs now render styled.** `buildDialog()` (which backs the
+  overridden `window.alert`/`window.confirm` — import summaries, export/clipboard
+  errors, bulk results, etc.) built its DOM with `custom-alert-*` class names that
+  no longer exist in the stylesheet; the styled modal system had been renamed to
+  `ui-modal-*`. With no matching CSS (and the global `button` reset stripping
+  chrome), every alert/confirm collapsed to raw unstyled text in the page corner.
+  `buildDialog()` now emits the same `ui-modal-overlay` / `ui-modal` /
+  `ui-modal-title` / `ui-modal-hint` / `ui-modal-buttons` classes the static
+  modals use, so dialogs render as a centered card with a backdrop. No CSS or
+  behavior changes; pure class-name alignment.
+
 ## [1.6.1] — 2026-06-18
 
 ### Fixed

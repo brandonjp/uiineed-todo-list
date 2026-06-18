@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.6.1';
+    var APP_VERSION = '1.6.2';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -155,23 +155,27 @@
     // ---- Custom dialogs (SEC-1: text set via textContent, never innerHTML) --
     function buildDialog(message, opts) {
         return new Promise(function (resolve) {
+            // Reuse the styled modal system (.ui-modal-*) that the static
+            // bulk/paste/settings modals use — these are the classes that
+            // actually exist in the stylesheet. The buttons keep the
+            // .custom-alert-btn cancel/confirm classes, matching those modals.
             var overlay = document.createElement('div');
-            overlay.className = 'custom-alert-overlay';
+            overlay.className = 'ui-modal-overlay';
             var box = document.createElement('div');
-            box.className = 'custom-alert';
+            box.className = 'ui-modal';
 
             var titleEl = document.createElement('div');
-            titleEl.className = 'custom-alert-title';
+            titleEl.className = 'ui-modal-title';
             titleEl.textContent = opts.title;
             box.appendChild(titleEl);
 
             var contentEl = document.createElement('div');
-            contentEl.className = 'custom-alert-content';
+            contentEl.className = 'ui-modal-hint';
             contentEl.textContent = message;
             box.appendChild(contentEl);
 
             var btnWrap = document.createElement('div');
-            btnWrap.className = 'custom-alert-buttons';
+            btnWrap.className = 'ui-modal-buttons';
             opts.buttons.forEach(function (b) {
                 var btn = document.createElement('button');
                 btn.className = 'custom-alert-btn ' + b.cls;
