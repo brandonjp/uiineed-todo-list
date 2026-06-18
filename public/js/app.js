@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.6.0';
+    var APP_VERSION = '1.6.1';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -378,7 +378,12 @@
         var byKey = {};
         targetList.forEach(function (t) { byId[t.id] = t; byKey[normKey(t)] = t; });
 
-        var added = 0, updated = 0, skipped = 0;
+        var updated = 0, skipped = 0;
+        // Collect genuinely-new items in incoming order, then unshift them as one
+        // batch after the loop. Unshifting one-by-one inside the loop would reverse
+        // the imported list (last item ends up on top); batching keeps file order
+        // while still landing new items at the front, like a single new todo does.
+        var added = [];
         incoming.forEach(function (inc) {
             if (inc.id != null && byId[inc.id]) {
                 var ex = byId[inc.id];
@@ -398,12 +403,12 @@
             // devices (later re-imports then match by id, not just by title).
             var newId = (inc.id != null && !byId[inc.id]) ? inc.id : genId();
             var nt = { id: newId, title: inc.title, completed: inc.completed, removed: false };
-            targetList.unshift(nt);
             byId[nt.id] = nt;
             byKey[normKey(nt)] = nt;
-            added++;
+            added.push(nt);
         });
-        return { added: added, updated: updated, skipped: skipped };
+        Array.prototype.unshift.apply(targetList, added);
+        return { added: added.length, updated: updated, skipped: skipped };
     }
 
     // ---- Cross-device sync reconcile (last-write-wins) ----------------------

@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.1] — 2026-06-18
+
+### Fixed
+- **Import order preserved.** `mergeImport()` added each new item with
+  `unshift` inside the loop, which silently **reversed** the imported list (the
+  last item in the file landed on top, the first sank to the bottom). New items
+  are now collected in file order and batch-unshifted once, so they still land
+  at the front (like a single new todo) but keep the order they appear in the
+  imported/synced file. Dedupe/update/skip behavior and the returned counts are
+  unchanged. Covered by two new `mergeImport` order tests in `test/logic.test.js`.
+
 ## [1.6.0] — 2026-06-18
 
 Optional **cross-device sync** for private deployments, via a tiny same-origin

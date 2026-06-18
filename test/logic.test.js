@@ -120,6 +120,19 @@ test('mergeImport: genuinely new id-less item is added', function () {
     assert.strictEqual(res.added, 1);
     assert.strictEqual(target.length, 2);
 });
+test('mergeImport: new items keep their file order at the front (no reversal)', function () {
+    var target = [];
+    core.mergeImport(target, [{ title: 'First' }, { title: 'Second' }, { title: 'Third' }]);
+    assert.deepStrictEqual(target.map(function (t) { return t.title; }),
+        ['First', 'Second', 'Third']);
+});
+test('mergeImport: new items land in front of existing ones, in file order', function () {
+    var target = [];
+    core.mergeImport(target, [{ title: 'Existing' }]);
+    core.mergeImport(target, [{ title: 'New A' }, { title: 'New B' }]);
+    assert.deepStrictEqual(target.map(function (t) { return t.title; }),
+        ['New A', 'New B', 'Existing']);
+});
 test('mergeImport: two-device round trip converges (A->B->A, no growth)', function () {
     // Device A starts with two items.
     var A = [];
