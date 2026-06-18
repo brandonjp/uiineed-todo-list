@@ -1478,6 +1478,38 @@ span.shortcut-name {
   gap: 12px;
 }
 
+.custom-alert-btn {
+  padding: 10px 22px;
+  border: var(--border);
+  border-radius: var(--border-radius);
+  background: var(--bg-normal);
+  color: var(--font-color);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.custom-alert-btn:hover,
+.custom-alert-btn:focus-visible {
+  box-shadow: var(--box-shadow);
+  transform: translate(-2px, -2px);
+}
+
+.custom-alert-btn:active {
+  box-shadow: none;
+  transform: translate(0, 0);
+}
+
+.custom-alert-btn.confirm {
+  background: var(--normal);
+}
+
+.custom-alert-btn.cancel {
+  background: var(--bg-normal);
+}
+
 /* ===== Settings panel chips ===== */
 .settings-row {
   margin-bottom: 18px;

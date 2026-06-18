@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.3] — 2026-06-18
+
+### Fixed
+- **Modal buttons are now styled.** The `.custom-alert-btn` class used by every
+  modal's action buttons (alert/confirm dialogs *and* the static bulk/paste/
+  settings modals) had no CSS rule, so the global `button` reset left them as
+  plain text. Added neo-brutalist button styling matching the rest of the app
+  (`.custom-alert-btn` base + `:hover`/`:focus-visible`/`:active`, with
+  `.confirm` using the `--normal` accent and `.cancel` neutral) — added to
+  `style.scss`, `style.css`, and the served `style.min.css`. All driven by theme
+  CSS variables, so every theme adapts automatically. Adds a visible focus ring
+  for keyboard users (the global `button:focus{outline:none}` had removed it).
+
+### Changed
+- Default `alert()` dialog title (EN) changed from **"Prompt"** to **"Notice"** —
+  it backs info messages like the import/bulk summaries, for which "Prompt" read
+  oddly. (The Chinese title "提示" already meant "Notice" and is unchanged.)
+
 ## [1.6.2] — 2026-06-18
 
 ### Fixed

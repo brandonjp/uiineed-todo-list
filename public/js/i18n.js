@@ -71,7 +71,7 @@ window.I18N = {
         // Dialog (alert/confirm) chrome
         dialogOK: 'OK',
         dialogCancel: 'Cancel',
-        dialogPromptTitle: 'Prompt',
+        dialogPromptTitle: 'Notice',
         dialogConfirmTitle: 'Please Confirm',
         errorTitle: 'Error',
 
