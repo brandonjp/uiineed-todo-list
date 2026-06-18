@@ -130,6 +130,13 @@ window.I18N = {
         sortNewest: 'Newest first',
         sortOldest: 'Oldest first',
         sortRandom: 'Shuffle',
+        sortManual: 'Manual order',
+        sortLabelManual: 'Manual',
+        sortLabelAZ: 'A–Z',
+        sortLabelZA: 'Z–A',
+        sortLabelNewest: 'Newest',
+        sortLabelOldest: 'Oldest',
+        sortLabelRandom: 'Shuffled',
 
         // Cross-device sync
         syncNow: 'Sync now',
@@ -264,6 +271,13 @@ window.I18N = {
         sortNewest: '最新在前',
         sortOldest: '最早在前',
         sortRandom: '随机打乱',
+        sortManual: '手动排序',
+        sortLabelManual: '手动',
+        sortLabelAZ: 'A–Z',
+        sortLabelZA: 'Z–A',
+        sortLabelNewest: '最新',
+        sortLabelOldest: '最早',
+        sortLabelRandom: '已打乱',
 
         // 跨设备同步
         syncNow: '立即同步',
