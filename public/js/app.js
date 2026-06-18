@@ -27,6 +27,7 @@
     var STORAGE_KEY = 'uiineed-todos';
     var RECYCLE_KEY = 'uiineed-recycle';
     var FILTER_KEY = 'uiineed-filter';
+    var SORT_KEY = 'uiineed-sort';          // local view pref: { mode, randomOrder } — NOT synced
     var SLOGAN_KEY = 'uiineed-slogan';
     var SETTINGS_KEY = 'uiineed-settings';
     var SYNC_KEY = 'uiineed-sync';          // local sync meta: { updatedAt, synced }
@@ -41,6 +42,22 @@
             return { theme: THEMES.indexOf(s.theme) >= 0 ? s.theme : 'classic' };
         } catch (e) {
             return { theme: 'classic' };
+        }
+    }
+
+    // Local-only sort/view preference. Mirrors loadSettings: tolerant of
+    // missing/garbage storage. If mode is 'random' but no order was stored,
+    // fall back to 'custom' so the view is deterministic on first render.
+    function loadSort() {
+        try {
+            var s = JSON.parse(localStorage.getItem(SORT_KEY) || '{}');
+            var modes = ['custom', 'az', 'za', 'newest', 'oldest', 'random'];
+            var mode = modes.indexOf(s.mode) >= 0 ? s.mode : 'custom';
+            var order = Array.isArray(s.randomOrder) ? s.randomOrder : [];
+            if (mode === 'random' && !order.length) mode = 'custom';
+            return { mode: mode, randomOrder: order };
+        } catch (e) {
+            return { mode: 'custom', randomOrder: [] };
         }
     }
 
@@ -482,6 +499,7 @@
     var initial = loadState();
     var settings = loadSettings();
     var syncMeta = loadSyncMeta();
+    var sortPref = loadSort();
     applyTheme(settings.theme); // apply before mount to avoid a flash
 
     var app = new Vue({
@@ -492,6 +510,8 @@
                 newTodoTitle: '',
                 editedTodo: null,
                 intention: localStorage.getItem(FILTER_KEY) || 'all', // restore last-used filter
+                sortMode: sortPref.mode,        // custom|az|za|newest|oldest|random — a VIEW, not a mutation
+                randomOrder: sortPref.randomOrder, // ids in shuffled order; the random lens reads this
                 checkEmpty: false,
                 recycleBin: initial.recycle,
                 dragIndex: null,
@@ -543,6 +563,8 @@
                 deep: true
             },
             intention: function (val) { safeSet(FILTER_KEY, val); this.clearConfirm(); },
+            sortMode: function () { this.saveSort(); },
+            randomOrder: function () { this.saveSort(); },
             paletteQuery: function () { this.paletteIndex = 0; },
             theme: function (val) {
                 safeSet(SETTINGS_KEY, JSON.stringify({ theme: val }));
@@ -581,6 +603,25 @@
                 if (this.intention === 'removed') return this.recycleBin;
                 return this.todos;
             },
+            // The rendered order: a non-destructive lens over filteredTodos.
+            // 'custom' is identity (manual order). Deterministic modes reuse the
+            // pure sortTodos helper. 'random' reads the stored randomOrder so it
+            // stays stable across edits (recomputing would re-roll on every key).
+            displayTodos: function () {
+                var list = this.filteredTodos;
+                if (this.sortMode === 'random') return orderByRandom(list, this.randomOrder);
+                if (this.sortMode === 'custom') return list;
+                return sortTodos(list, this.sortMode);
+            },
+            // Localized label for the sort button, reflecting the active mode.
+            currentSortLabel: function () {
+                var t = this.t;
+                var map = {
+                    custom: t.sortLabelManual, az: t.sortLabelAZ, za: t.sortLabelZA,
+                    newest: t.sortLabelNewest, oldest: t.sortLabelOldest, random: t.sortLabelRandom
+                };
+                return map[this.sortMode] || t.sortLabelManual;
+            },
             showEmptyTips: function () {
                 return this.filteredTodos.length === 0 && this.intention !== 'removed';
             },
@@ -598,11 +639,12 @@
             actions: function () {
                 var self = this, t = this.t;
                 return [
-                    { id: 'sort-az',        label: t.sortAZ,           icon: '↓',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('az'); } },
-                    { id: 'sort-za',        label: t.sortZA,           icon: '↑',  section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('za'); } },
-                    { id: 'sort-newest',    label: t.sortNewest,       icon: '🕒', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('newest'); } },
-                    { id: 'sort-oldest',    label: t.sortOldest,       icon: '🕘', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('oldest'); } },
-                    { id: 'sort-random',    label: t.sortRandom,       icon: '🔀', section: 'sort',     when: this.todos.length > 1,         run: function () { self.sortBy('random'); } },
+                    { id: 'sort-manual',    label: t.sortManual,       icon: '↕',  section: 'sort', mode: 'custom', when: this.todos.length > 1,    run: function () { self.sortBy('custom'); } },
+                    { id: 'sort-az',        label: t.sortAZ,           icon: '↓',  section: 'sort', mode: 'az',     when: this.todos.length > 1,    run: function () { self.sortBy('az'); } },
+                    { id: 'sort-za',        label: t.sortZA,           icon: '↑',  section: 'sort', mode: 'za',     when: this.todos.length > 1,    run: function () { self.sortBy('za'); } },
+                    { id: 'sort-newest',    label: t.sortNewest,       icon: '🕒', section: 'sort', mode: 'newest', when: this.todos.length > 1,    run: function () { self.sortBy('newest'); } },
+                    { id: 'sort-oldest',    label: t.sortOldest,       icon: '🕘', section: 'sort', mode: 'oldest', when: this.todos.length > 1,    run: function () { self.sortBy('oldest'); } },
+                    { id: 'sort-random',    label: t.sortRandom,       icon: '🔀', section: 'sort', mode: 'random', when: this.todos.length > 1,    run: function () { self.sortBy('random'); } },
                     { id: 'finishAll',      label: t.finishAll,        icon: '✓',  section: 'organize', when: this.leftTodosCount > 0,       run: function () { self.markAllAsCompleted(); } },
                     { id: 'clearCompleted', label: t.clearCompletedBtn, icon: '🧹', section: 'cleanup',  when: this.completedTodosCount > 0,  run: function () { self.clearCompleted(); } },
                     { id: 'clearAll',       label: t.clearAllBtn,      icon: '🗑', section: 'cleanup',  danger: true, when: this.todos.length > 0, run: function () { self.clearAll(); } },
@@ -770,21 +812,21 @@
                 });
             },
 
-            // One-shot reorder of the active list.
-            // modes: 'az' | 'za' | 'newest' | 'oldest' | 'random'.
-            // Reassigning todos keeps reactivity and persists via the watcher.
+            // Choose a sort VIEW. Never mutates this.todos (the manual order).
+            // modes: 'custom' | 'az' | 'za' | 'newest' | 'oldest' | 'random'.
             sortBy: function (mode) {
                 if (mode === 'random') {
-                    var a = this.todos.slice();
-                    for (var i = a.length - 1; i > 0; i--) {
-                        var j = Math.floor(Math.random() * (i + 1));
-                        var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
-                    }
-                    this.todos = a;
+                    this.randomOrder = shuffleIds(this.todos); // roll once; re-rolls on repeat click
+                    this.sortMode = 'random';
                 } else {
-                    this.todos = sortTodos(this.todos, mode);
+                    this.sortMode = mode; // 'custom' restores the manual order; others are pure views
                 }
                 this.closeSort();
+            },
+            setManual: function () { this.sortBy('custom'); },
+            // Persist the local-only view pref (NOT synced), like the filter key.
+            saveSort: function () {
+                safeSet(SORT_KEY, JSON.stringify({ mode: this.sortMode, randomOrder: this.randomOrder }));
             },
 
             // ---- Cross-device sync (optional same-origin PHP backend) ------
