@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] — 2026-06-18
+
+### Added
+- **Sorting is now a non-destructive view.** Your manual order is always
+  preserved; A–Z / Z–A / Newest / Oldest / Shuffle reorder only what's shown.
+  The sort button shows the active mode (Manual / A–Z / Z–A / Newest / Oldest /
+  Shuffled) and the sort menu has a **Manual order** entry plus a ✓ on the
+  active mode, so you always know what you're looking at and can get back.
+- Shuffle rolls a stable random order once (stored locally) instead of
+  re-shuffling on every edit; clicking Shuffle again re-rolls. A task added
+  while shuffled appears at the top until the next shuffle.
+
+### Fixed
+- **Desktop drag-to-reorder now works.** Previously the list was re-spliced on
+  every `dragenter`, and the keyed `<transition-group>` FLIP-moved the dragged
+  row mid-drag, which aborts the native HTML5 drag — so the reorder never
+  landed. The move is now committed once on `dragend`, leaving the dragged node
+  in place during the gesture. Touch drag continues to work.
+
+### Changed
+- Choosing a sort no longer reorders your other synced devices (sorting no
+  longer mutates `todos`). The sort/view preference is stored locally
+  (`uiineed-sort`) and is intentionally **not** synced.
+- Dragging an item now defines your manual order: it bakes the current visible
+  order in and switches the indicator to **Manual**.
+
 ## [1.6.4] — 2026-06-18
 
 ### Fixed
