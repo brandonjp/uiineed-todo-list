@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.7.0';
+    var APP_VERSION = '1.7.1';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -515,7 +515,6 @@
                 checkEmpty: false,
                 recycleBin: initial.recycle,
                 dragIndex: null,
-                dragOverIndex: null,
                 enterIndex: '',
                 show: true,
                 delayTime: '1',
@@ -1110,9 +1109,9 @@
 
             // Bake the current VISIBLE order into the manual order and switch to
             // it. Called at drag start so the rendered indices line up 1:1 with
-            // this.todos before any move. Order is unchanged at this instant
-            // (displayTodos === the rendered list), so no DOM node moves and the
-            // native drag is not disturbed. 'all'-view only (drag is too).
+            // this.todos before the live reorder begins. The order is unchanged
+            // at this instant (displayTodos === the rendered list), so nothing
+            // jumps. 'all'-view only (drag is too).
             bakeManualOrder: function () {
                 if (this.intention !== 'all') return;
                 if (this.sortMode !== 'custom') {
@@ -1121,27 +1120,37 @@
                 }
             },
 
-            // Desktop HTML5 drag-and-drop.
-            // We do NOT splice the list during the drag: moving the dragged <li>
-            // in the DOM (as live reorder + the keyed transition-group's FLIP did)
-            // aborts the native drag. Instead we track the hovered index and
-            // commit the move once, on dragend.
-            dragstart: function (index) {
+            // Desktop HTML5 drag-and-drop. Live-reorders as the cursor passes
+            // over other items — the long-standing approach that works reliably
+            // on desktop.
+            //
+            // setData()/effectAllowed in dragstart are REQUIRED by Safari and
+            // Firefox to actually begin an element drag; without them those
+            // browsers cancel it immediately (the cursor shows a drag but the
+            // item never moves). Chrome works without them. dragstart also bakes
+            // a sorted view down to the manual order first, so the visible
+            // indices map 1:1 onto this.todos for the moveItem() splices.
+            dragstart: function (e, index) {
                 if (this.intention !== 'all') return;
                 this.bakeManualOrder();
                 this.dragIndex = index;
-                this.dragOverIndex = index;
+                if (e && e.dataTransfer) {
+                    try { e.dataTransfer.setData('text/plain', String(index)); } catch (err) {}
+                    e.dataTransfer.effectAllowed = 'move';
+                }
             },
             dragenter: function (e, index) {
                 e.preventDefault();
-                this.dragOverIndex = index; // track only; no list mutation mid-drag
+                if (this.dragIndex !== null && this.dragIndex !== index) {
+                    this.moveItem(this.dragIndex, index);
+                    this.dragIndex = index;
+                }
             },
-            dragover: function (e) { e.preventDefault(); }, // mark a valid drop target
-            dragend: function () {
-                this.moveItem(this.dragIndex, this.dragOverIndex); // single commit
-                this.dragIndex = null;
-                this.dragOverIndex = null;
+            dragover: function (e) {
+                e.preventDefault();                                  // valid drop target
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
             },
+            dragend: function () { this.dragIndex = null; },
 
             // Touch drag (mobile): long-press to pick up, then drag to reorder.
             // Long-press avoids fighting with normal list scrolling — a quick

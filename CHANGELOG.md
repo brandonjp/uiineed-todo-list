@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.1] — 2026-06-18
+
+### Fixed
+- **Desktop drag-to-reorder, which regressed in 1.7.0.** The 1.7.0 rewrite
+  switched from live-reordering during the drag to committing the move once on
+  `dragend`. That fails outside Chrome: Safari and Firefox won't even start an
+  element drag unless `dataTransfer.setData()` is called in `dragstart`, so the
+  cursor showed a drag but the card never moved and nothing saved. Restored the
+  long-standing **live-reorder-on-`dragenter`** behavior and added the
+  `setData()` / `effectAllowed` / `dropEffect` calls that Safari and Firefox
+  require. Dragging from a sorted view still bakes the visible order into the
+  manual order first (so the indicator flips to Manual and the move sticks).
+
 ## [1.7.0] — 2026-06-18
 
 ### Added
