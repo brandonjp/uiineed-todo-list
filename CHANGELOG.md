@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.3] — 2026-06-18
+
+### Changed
+- **Clearer drag feedback.** While dragging a card on desktop, the live source
+  row is now hidden (its space preserved as a blank gap) so only the drag ghost
+  is visible and the gap clearly marks where the item will land. The row
+  reappears in place on drop. (The hide is deferred one tick so the browser's
+  drag image is captured first and the ghost isn't blanked.)
+
 ## [1.7.2] — 2026-06-18
 
 ### Fixed

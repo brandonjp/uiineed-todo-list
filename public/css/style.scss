@@ -1484,6 +1484,10 @@ span.shortcut-name{
 /* Touch long-press drag feedback */
 .todo-item.touch-dragging .todo-content { box-shadow: var(--box-shadow); transform: scale(1.02); opacity: 0.92; }
 .todo-item.touch-dragging { z-index: 5; }
+// While a desktop drag is in progress, hide the live source row but keep its
+// space, so only the drag ghost is visible and the blank gap shows where the
+// item will land. Restored on dragend.
+.todo-item.drag-source { visibility: hidden; }
 
 /* ===== Right-side menu UX (v1.2.0): tabs, context bar, More, palette ===== */
 

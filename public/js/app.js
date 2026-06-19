@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.7.2';
+    var APP_VERSION = '1.7.3';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -532,6 +532,7 @@
                 checkEmpty: false,
                 recycleBin: initial.recycle,
                 dragIndex: null,
+                isDragging: false,
                 enterIndex: '',
                 show: true,
                 delayTime: '1',
@@ -1164,6 +1165,12 @@
                     try { e.dataTransfer.setData('text/plain', String(index)); } catch (err) {}
                     e.dataTransfer.effectAllowed = 'move';
                 }
+                // Hide the source row (keeping its space) so only the drag ghost
+                // shows and the blank gap marks where it will land. Deferred a
+                // tick: the browser snapshots the drag image at dragstart, so
+                // hiding synchronously would blank the ghost too.
+                var self = this;
+                setTimeout(function () { if (self.dragIndex !== null) self.isDragging = true; }, 0);
             },
             dragenter: function (e, index) {
                 e.preventDefault();
@@ -1176,7 +1183,7 @@
                 e.preventDefault();                                  // valid drop target
                 if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
             },
-            dragend: function () { this.dragIndex = null; },
+            dragend: function () { this.dragIndex = null; this.isDragging = false; },
 
             // Touch drag (mobile): long-press to pick up, then drag to reorder.
             // Long-press avoids fighting with normal list scrolling — a quick
