@@ -142,7 +142,7 @@ The personal information section is as follows:
   sync automatically (blob-level last-write-wins, refresh to pull). Leave it out and
   nothing changes — the app stays 100% local. See [`docs/SYNC.md`](./docs/SYNC.md).
 
-> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.7.1).
+> See [CHANGELOG.md](./CHANGELOG.md) for release notes (current version 1.7.2).
 
 ## Authors
 - Rico's Blog <a href="https://blog.ricocc.com/" target="_blank">@Ricocc</a>

@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.7.1';
+    var APP_VERSION = '1.7.2';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -294,6 +294,22 @@
         }).map(function (x) { return x.todo; });
     }
 
+    // Translate a reorder expressed in VISIBLE (filtered + sorted) indices into
+    // indices into the full todos array. This lets a drag inside a filtered view
+    // (In Progress / Completed) map back onto the canonical list while the hidden
+    // items keep their positions. Returns { from, to } indices into fullList, or
+    // null for a no-op / out-of-range / not-found move. Relies on todo reference
+    // identity (filter/sort/map all preserve the same object refs).
+    function realMoveIndices(fullList, visibleList, from, to) {
+        if (!Array.isArray(fullList) || !Array.isArray(visibleList)) return null;
+        if (from == null || to == null || from === to) return null;
+        var moved = visibleList[from], target = visibleList[to];
+        if (!moved || !target) return null;
+        var realFrom = fullList.indexOf(moved), realTo = fullList.indexOf(target);
+        if (realFrom < 0 || realTo < 0 || realFrom === realTo) return null;
+        return { from: realFrom, to: realTo };
+    }
+
     // Fisher–Yates shuffle of the todos' ids -> a fresh randomOrder array.
     function shuffleIds(todos) {
         var ids = (todos || []).map(function (t) { return t && t.id; });
@@ -349,7 +365,8 @@
             idTime: idTime,
             sortTodos: sortTodos,
             orderByRandom: orderByRandom,
-            shuffleIds: shuffleIds
+            shuffleIds: shuffleIds,
+            realMoveIndices: realMoveIndices
         };
         return;
     }
@@ -1097,27 +1114,36 @@
             },
 
             // Shared reorder used by both desktop drag-and-drop and touch drag.
-            // Reordering only makes sense on the unfiltered "all" view.
+            // `from`/`to` are indices into the VISIBLE list (displayTodos). In a
+            // filtered view (In Progress / Completed) they're translated back onto
+            // the full todos array so the hidden items keep their positions. Trash
+            // (recycleBin) isn't part of todos, so it stays non-reorderable.
             moveItem: function (from, to) {
-                if (this.intention !== 'all') return;
-                if (from == null || to == null || from === to) return;
-                var src = this.todos[from];
-                if (!src) return;
-                this.todos.splice(from, 1);
-                this.todos.splice(to, 0, src);
+                if (this.intention === 'removed') return;
+                var m = realMoveIndices(this.todos, this.displayTodos, from, to);
+                if (!m) return;
+                var moved = this.todos[m.from];
+                this.todos.splice(m.from, 1);
+                this.todos.splice(m.to, 0, moved);
             },
 
             // Bake the current VISIBLE order into the manual order and switch to
-            // it. Called at drag start so the rendered indices line up 1:1 with
+            // it. Called at drag start so the rendered indices line up with
             // this.todos before the live reorder begins. The order is unchanged
             // at this instant (displayTodos === the rendered list), so nothing
-            // jumps. 'all'-view only (drag is too).
+            // jumps. In a filtered view only the visible items are rewritten in
+            // their displayed order; hidden items keep their slots. Trash excluded.
             bakeManualOrder: function () {
-                if (this.intention !== 'all') return;
-                if (this.sortMode !== 'custom') {
-                    this.todos = this.displayTodos.slice();
-                    this.sortMode = 'custom';
-                }
+                if (this.intention === 'removed') return;
+                if (this.sortMode === 'custom') return;
+                var visible = this.displayTodos;
+                var inView = {};
+                visible.forEach(function (t) { inView[t.id] = true; });
+                var queue = visible.slice();
+                this.todos = this.todos.map(function (t) {
+                    return inView[t.id] ? queue.shift() : t;
+                });
+                this.sortMode = 'custom';
             },
 
             // Desktop HTML5 drag-and-drop. Live-reorders as the cursor passes
@@ -1131,7 +1157,7 @@
             // a sorted view down to the manual order first, so the visible
             // indices map 1:1 onto this.todos for the moveItem() splices.
             dragstart: function (e, index) {
-                if (this.intention !== 'all') return;
+                if (this.intention === 'removed') return;
                 this.bakeManualOrder();
                 this.dragIndex = index;
                 if (e && e.dataTransfer) {
@@ -1156,7 +1182,7 @@
             // Long-press avoids fighting with normal list scrolling — a quick
             // swipe scrolls; holding still for ~280ms starts a drag.
             touchStartItem: function (index, e) {
-                if (this.intention !== 'all') return;
+                if (this.intention === 'removed') return;
                 var touch = e.touches && e.touches[0];
                 if (!touch) return;
                 this.dragIndex = index;

@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.2] — 2026-06-18
+
+### Fixed
+- **Drag-to-reorder now works in the In Progress and Completed views, not just
+  All.** Reordering was hard-restricted to the All view (every drag handler
+  bailed out with `intention !== 'all'`), so for anyone working in In Progress
+  the drag never even started — the cursor showed a drag but nothing moved. A
+  move made in a filtered view is now translated back onto the full list, so the
+  visible items reorder while the hidden (e.g. completed) ones keep their places.
+  Trash stays non-reorderable (its items live in the recycle bin, not the list).
+
+### Added
+- **The OPEN menu (filters / sort / actions) is now pinned on scroll.** On
+  desktop it stays put in the right-hand gutter instead of scrolling out of view
+  with a long list. Its horizontal position is unchanged; mobile is unaffected.
+
 ## [1.7.1] — 2026-06-18
 
 ### Fixed

@@ -283,6 +283,44 @@ test('shuffleIds: returns a permutation of the input ids', function () {
     assert.deepStrictEqual(ids.slice().sort(), ['a', 'b', 'c']);
 });
 
+// ---- realMoveIndices (filtered-view reorder mapping) --------------------
+// Apply the splice the way moveItem does, to assert the resulting order.
+function applyMove(full, m) { var moved = full[m.from]; full.splice(m.from, 1); full.splice(m.to, 0, moved); return full; }
+test('realMoveIndices: all-view move maps 1:1 (visible === full)', function () {
+    var A = { id: 'a' }, B = { id: 'b' }, C = { id: 'c' }, D = { id: 'd' };
+    var full = [A, B, C, D];
+    var m = core.realMoveIndices(full, [A, B, C, D], 0, 2);
+    assert.deepStrictEqual(m, { from: 0, to: 2 });
+    assert.deepStrictEqual(applyMove(full.slice(), m).map(function (t) { return t.id; }), ['b', 'c', 'a', 'd']);
+});
+test('realMoveIndices: filtered view maps visible indices onto full list', function () {
+    var A = { id: 'a' }, B = { id: 'b' }, C = { id: 'c' }, D = { id: 'd' };
+    var full = [A, B, C, D];
+    var visible = [B, D]; // e.g. the two ongoing items, A & C hidden/completed
+    // drag visible 0 (B) onto visible 1 (D)
+    var m = core.realMoveIndices(full, visible, 0, 1);
+    assert.deepStrictEqual(m, { from: 1, to: 3 });
+    var out = applyMove(full.slice(), m).map(function (t) { return t.id; });
+    assert.deepStrictEqual(out, ['a', 'c', 'd', 'b']); // hidden a,c stay; visible becomes [d,b]
+});
+test('realMoveIndices: hidden items keep their positions (move up across a hidden one)', function () {
+    var A = { id: 'a' }, B = { id: 'b' }, C = { id: 'c' }, D = { id: 'd' };
+    var full = [B, A, C, D]; // A hidden (completed), visible = [B, C, D]
+    var visible = [B, C, D];
+    // drag visible 2 (D) onto visible 0 (B)
+    var m = core.realMoveIndices(full, visible, 2, 0);
+    assert.deepStrictEqual(m, { from: 3, to: 0 });
+    var out = applyMove(full.slice(), m).map(function (t) { return t.id; });
+    assert.deepStrictEqual(out, ['d', 'b', 'a', 'c']); // A still right after the moved-from gap; visible [d,b,c]
+});
+test('realMoveIndices: same position / out of range / not found -> null', function () {
+    var A = { id: 'a' }, B = { id: 'b' }, X = { id: 'x' };
+    assert.strictEqual(core.realMoveIndices([A, B], [A, B], 1, 1), null); // no-op
+    assert.strictEqual(core.realMoveIndices([A, B], [A, B], 0, 5), null); // to out of range
+    assert.strictEqual(core.realMoveIndices([A, B], [A, B], 9, 0), null); // from out of range
+    assert.strictEqual(core.realMoveIndices([A, B], [X, A], 0, 1), null); // X not in full
+});
+
 // ---- planSync: the cross-device last-write-wins decision -----------------
 // planSync(local, remote) decides what a device should do when it sees the
 // remote blob. local = { updatedAt, hasData, synced }; remote = parsed blob
