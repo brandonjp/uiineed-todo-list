@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.4] — 2026-06-18
+
+### Fixed
+- **OPEN side menu no longer overlaps the top nav on load.** v1.7.2 pinned the
+  menu with `position: fixed` but anchored it at `top: 24px` — the same vertical
+  band as the fixed `.nav` (GitHub / About / language switcher), so the language
+  selector sat on top of the menu. The menu now anchors at `top: 203px`, level
+  with the top of the task-list card (`.container.main` sits 202.6px below the
+  viewport top on desktop, stable across all widths), restoring the pre-1.7.2
+  load position while keeping the menu pinned and reachable as a long list
+  scrolls. Mobile (bottom-docked) layout is unchanged.
+
 ## [1.7.3] — 2026-06-18
 
 ### Changed

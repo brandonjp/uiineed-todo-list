@@ -901,9 +901,13 @@ a.inspiration:focus{
     // while scrolling a long list. left: 50% + 378px reproduces the old absolute
     // position (calc(100% + 28px) off the 700px-centered container) exactly, so
     // nothing shifts horizontally. Mobile overrides this in the md breakpoint.
+    // top: 203px lands the menu level with the top of the task-list card
+    // (.container.main sits 202.6px below the viewport top on desktop, stable
+    // across all widths), clearing the fixed .nav (bottom ~46px) so the
+    // language switcher no longer overlaps it on load.
     position: fixed;
     left:calc( 50% + 378px);
-    top:24px;
+    top:203px;
     display: flex;
     justify-content: flex-start;
     align-items: flex-start;
