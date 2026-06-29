@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.8.1] — 2026-06-29
+
+### Fixed
+- **Search box no longer widens the OPEN sidebar.** The `.side-bar` is a
+  shrink-to-fit column with no explicit width — its width came from its widest
+  child (the filter tabs, `min-width: 156px`). The new search `<input>` carried a
+  default intrinsic width of ~20 characters (the HTML `size` default), which
+  exceeded 156px and stretched the whole sidebar wider even though it was set to
+  `width: 100%`. On narrow or zoomed viewports that extra width pushed the fixed
+  sidebar partly off-screen and caused horizontal scrolling / cut-off. Fixed by
+  capping the input's intrinsic width with `size="1"` (visual width still driven
+  by `width: 100%`) and giving the `.todo-search` wrapper `width: 100%` +
+  `min-width: 0`, so the sidebar returns to its original tabs-driven width.
+
 ## [1.8.0] — 2026-06-29
 
 ### Added
