@@ -122,6 +122,11 @@ window.I18N = {
         paletteEmpty: 'No matching commands',
         paletteShortcut: '⌘K',
 
+        // In-view task search
+        searchPlaceholder: 'Search tasks…',
+        searchClear: 'Clear search',
+        searchNoMatch: 'No tasks match “{q}”',
+
         // Inline confirm + sort
         confirmReady: 'Tap to confirm',
         sortBtn: 'Sort',
@@ -262,6 +267,11 @@ window.I18N = {
         palettePlaceholder: '搜索操作…',
         paletteEmpty: '没有匹配的命令',
         paletteShortcut: '⌘K',
+
+        // 视图内任务搜索
+        searchPlaceholder: '搜索任务…',
+        searchClear: '清除搜索',
+        searchNoMatch: '没有任务匹配“{q}”',
 
         // 行内确认 + 排序
         confirmReady: '点击确认',

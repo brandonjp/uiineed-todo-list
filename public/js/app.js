@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.7.3';
+    var APP_VERSION = '1.8.0';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -527,6 +527,7 @@
                 newTodoTitle: '',
                 editedTodo: null,
                 intention: localStorage.getItem(FILTER_KEY) || 'all', // restore last-used filter
+                searchQuery: '',                // transient in-view text filter (not persisted)
                 sortMode: sortPref.mode,        // custom|az|za|newest|oldest|random — a VIEW, not a mutation
                 randomOrder: sortPref.randomOrder, // ids in shuffled order; the random lens reads this
                 checkEmpty: false,
@@ -621,12 +622,26 @@
                 if (this.intention === 'removed') return this.recycleBin;
                 return this.todos;
             },
-            // The rendered order: a non-destructive lens over filteredTodos.
+            // True while a non-empty text search is narrowing the current view.
+            searchActive: function () { return this.searchQuery.trim().length > 0; },
+            // Text-filter lens over the active tab's list. Case-insensitive
+            // substring match on title; an empty/whitespace query is a passthrough.
+            // Only ever narrows what's already visible — never reveals out-of-view
+            // (hidden/completed/trashed) tasks. Object refs are preserved so the
+            // drag index translation in realMoveIndices keeps working.
+            searchedTodos: function () {
+                var q = this.searchQuery.trim().toLowerCase();
+                if (!q) return this.filteredTodos;
+                return this.filteredTodos.filter(function (todo) {
+                    return (todo.title || '').toLowerCase().indexOf(q) !== -1;
+                });
+            },
+            // The rendered order: a non-destructive lens over searchedTodos.
             // 'custom' is identity (manual order). Deterministic modes reuse the
             // pure sortTodos helper. 'random' reads the stored randomOrder so it
             // stays stable across edits (recomputing would re-roll on every key).
             displayTodos: function () {
-                var list = this.filteredTodos;
+                var list = this.searchedTodos;
                 if (this.sortMode === 'random') return orderByRandom(list, this.randomOrder);
                 if (this.sortMode === 'custom') return list;
                 return sortTodos(list, this.sortMode);
@@ -642,6 +657,11 @@
             },
             showEmptyTips: function () {
                 return this.filteredTodos.length === 0 && this.intention !== 'removed';
+            },
+            // Distinct from "no tasks at all": the view has tasks, but the active
+            // search term matches none of them.
+            showNoMatch: function () {
+                return this.searchActive && this.filteredTodos.length > 0 && this.searchedTodos.length === 0;
             },
             themeOptions: function () {
                 var t = this.t;
@@ -1158,7 +1178,7 @@
             // a sorted view down to the manual order first, so the visible
             // indices map 1:1 onto this.todos for the moveItem() splices.
             dragstart: function (e, index) {
-                if (this.intention === 'removed') return;
+                if (this.intention === 'removed' || this.searchActive) return;
                 this.bakeManualOrder();
                 this.dragIndex = index;
                 if (e && e.dataTransfer) {
@@ -1189,7 +1209,7 @@
             // Long-press avoids fighting with normal list scrolling — a quick
             // swipe scrolls; holding still for ~280ms starts a drag.
             touchStartItem: function (index, e) {
-                if (this.intention === 'removed') return;
+                if (this.intention === 'removed' || this.searchActive) return;
                 var touch = e.touches && e.touches[0];
                 if (!touch) return;
                 this.dragIndex = index;
@@ -1336,6 +1356,20 @@
                 }
                 this.armConfirm(a);
             },
+            // In-view search helpers
+            clearSearch: function () {
+                this.searchQuery = '';
+                var self = this;
+                this.$nextTick(function () {
+                    if (self.$refs.searchInput) self.$refs.searchInput.focus();
+                });
+            },
+            focusSearch: function () {
+                var self = this;
+                this.$nextTick(function () {
+                    if (self.$refs.searchInput) self.$refs.searchInput.focus();
+                });
+            },
             openPalette: function () {
                 this.paletteQuery = '';
                 this.paletteIndex = 0;
@@ -1356,17 +1390,30 @@
                 if (a) this.runAction(a);
             },
             onKeydown: function (e) {
+                var el = e.target;
+                var typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
                 // Cmd/Ctrl+K toggles the palette from anywhere.
                 if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
                     e.preventDefault();
                     if (this.showPalette) this.closePalette(); else this.openPalette();
                     return;
                 }
+                // "/" focuses the in-view search — but not while typing elsewhere,
+                // and not when a modal/palette owns the keyboard.
+                if (e.key === '/' && !typing && !this.showPalette && !this.showMore && !this.showSort) {
+                    if (this.todos.length) { e.preventDefault(); this.focusSearch(); return; }
+                }
                 if (e.key === 'Escape') {
                     if (this.showPalette) { this.closePalette(); return; }
                     if (this.showMore) { this.closeMore(); return; }
                     if (this.showSort) { this.closeSort(); return; }
                     if (this.confirmId) { this.clearConfirm(); return; }
+                    // Esc in the search field clears + blurs it.
+                    if (el && el === this.$refs.searchInput && this.searchActive) {
+                        this.searchQuery = '';
+                        el.blur();
+                        return;
+                    }
                 }
                 if (!this.showPalette) return;
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.paletteMove(1); }
