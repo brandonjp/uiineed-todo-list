@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] — 2026-06-29
+
+### Added
+- **In-view task search.** A compact search box now sits at the top of the OPEN
+  toolbar, directly above the All / In Progress / Completed / Trash tabs. Typing
+  filters the **currently displayed** list by task title (case-insensitive
+  substring) — it only ever narrows what's already on screen and never surfaces
+  hidden, completed, or trashed tasks from other views. To search those, switch
+  to that view first. The query persists as you flip between tabs (re-filtering
+  the new view) but is transient — it resets on reload and is never saved.
+  - Press `/` anywhere to jump to the search box; `Esc` (or the inline `×`)
+    clears it. The box only appears once you have at least one task.
+  - When nothing matches, a "No tasks match …" message with a one-click
+    "Clear search" replaces the list.
+  - Drag-to-reorder is paused while a search is active (clear the search to
+    reorder again), since reordering a text-narrowed subset is ambiguous —
+    mirroring how the Trash view is already non-reorderable.
+  - New `searchedTodos` lens slots between the tab filter and the sort lens, so
+    search and sort compose: search narrows, sort orders the result.
+
 ## [1.7.4] — 2026-06-18
 
 ### Fixed

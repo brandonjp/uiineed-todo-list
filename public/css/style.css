@@ -1742,6 +1742,86 @@ span.shortcut-name {
   background: rgba(128, 128, 128, 0.38);
 }
 
+/* In-view task search (sits above the filter tabs) */
+.todo-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid var(--black);
+}
+
+.todo-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 30px 9px 12px;
+  border: var(--border);
+  border-radius: var(--border-radius);
+  background: var(--bg-normal);
+  color: var(--font-color);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+}
+
+.todo-search-input:focus {
+  box-shadow: var(--box-shadow);
+}
+
+.todo-search-clear {
+  position: absolute;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.22);
+  color: var(--font-color);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.todo-search-clear:hover {
+  background: rgba(128, 128, 128, 0.38);
+}
+
+.search-no-match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: var(--font-color);
+  text-align: center;
+}
+
+.search-no-match-text {
+  opacity: 0.75;
+  font-size: 15px;
+}
+
+.search-no-match-clear {
+  padding: 8px 16px;
+  border: var(--border);
+  border-radius: var(--border-radius);
+  background: var(--bg-normal);
+  color: var(--font-color);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.search-no-match-clear:hover {
+  box-shadow: var(--box-shadow);
+  transform: translate(-1px, -1px);
+}
+
 .context-bar {
   display: flex;
   flex-direction: column;
