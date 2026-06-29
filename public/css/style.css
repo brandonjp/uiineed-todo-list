@@ -1747,12 +1747,15 @@ span.shortcut-name {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
   padding: 10px;
   border-bottom: 1px solid var(--black);
 }
 
 .todo-search-input {
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   padding: 9px 30px 9px 12px;
   border: var(--border);
