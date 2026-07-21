@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.9.1] — 2026-07-21
+
+### Added
+- **In-app "Sign out" link.** A subtle logout link sits below the language
+  switcher at the bottom of the sidebar (both `index.php` and `index-zh.php`).
+  In standalone/home-screen PWA mode there's no address bar, so `/logout.php`
+  was otherwise unreachable — this makes signing out one tap. Same-origin link,
+  so it stays inside the installed web app.
+
 ## [1.9.0] — 2026-07-21
 
 ### Changed
