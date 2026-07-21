@@ -7,14 +7,14 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.9.1">
+    <meta name="version" content="1.9.2">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <title>Todo List Online 极简设计的网页版 Todo 清单 - 无需登陆 - By Ricocc</title>
     <meta name="keywords" content="无需登录, 不用账号,online todo, todo, todo list,在线Todo,网页todo,备忘录, Todo清单, 在线Todo清单,无需注册登陆,极简清单,即开即用,便签, 提醒, 日程, 记事本, 记事, 待办事件,online todolist, online 清单,online 待办事项,极简的待办事项" />
     <meta name="description" content="一款优秀的设计简洁的online todolist 网页版本应用,极简的待办事项,Todo清单,无需注册,无需登录, 不用账号,数据安全, 存储在H5浏览器本地缓存, 提供工作和生活辅助! 在线Todo清单,免登录,做最好的 online todo list 清单应用." />
     <link type="favicon" rel="shortcut icon" href="public/img/favicon.png" />
     <link href="public/css/normalize.css" rel="stylesheet" media="screen">
-    <link href="public/css/style.min.css?v=1.9.1" rel="stylesheet" media="screen">
+    <link href="public/css/style.min.css?v=1.9.2" rel="stylesheet" media="screen">
     <script>
         // 自动判断语言并切换
         const browserLanguage = navigator.language || navigator.userLanguage;
@@ -25,7 +25,7 @@
     </script>
     <style>[v-cloak]{display:none}</style>
     <script>window.UIINEED_LANG = 'zh';</script>
-    <script src="public/js/i18n.js?v=1.9.1"></script>
+    <script src="public/js/i18n.js?v=1.9.2"></script>
     <!-- Vue 2.x  Todo List   使用CDN就无需引入本地文件 -->
     <!-- <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script> -->
     <script src="public/js/vue.js"></script>
@@ -400,14 +400,17 @@
                     <span>/</span>
                     <a href="javascript:;" target="_self" class="zh active" draggable="false">中</a>
                 </div>
-                <a href="logout.php" class="logout-link" draggable="false"
-                   style="display:block;text-align:center;margin-top:14px;font-size:12px;color:#b0b0b0;text-decoration:none;">退出登录</a>
+                <div class="github logout">
+                    <a href="logout.php" class="social-link" title="退出登录" aria-label="退出登录" draggable="false">
+                        <img src="public/img/social/logout.svg" class="ic-social" alt="退出登录" draggable="false">
+                    </a>
+                </div>
             </div>
 
         </div>
     </div>
 
-    <script src="public/js/app.js?v=1.9.1"></script>
+    <script src="public/js/app.js?v=1.9.2"></script>
 
 
 </body>
