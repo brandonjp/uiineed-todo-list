@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] — 2026-07-21
+
+### Changed
+- **Auth is now a cookie-session login, replacing HTTP Basic Auth.** The old
+  `.htaccess` Basic Auth gate was miserable on iPhone: iOS password managers
+  can't autofill Basic Auth dialogs, and in home-screen/PWA mode Safari fires
+  several `401`s before surfacing the credential prompt. Basic Auth is also
+  stateless — no cookie, no adjustable session — so nothing could be tuned.
+  - New self-hosted, same-origin flow: `login.php` shows a normal (autofillable)
+    HTML form and, on the correct passphrase, sets an HMAC-signed cookie
+    (`HttpOnly`, `Secure`, `SameSite=Lax`). `auth.php` verifies it and gates the
+    front door and data endpoint; `logout.php` clears it.
+  - **"Remember me"** issues a 1-year persistent cookie; unchecked = a session
+    cookie (the temp/shared-device path).
+  - The cookie signature is bound to the stored password hash, so changing the
+    passphrase (or the signing key) instantly invalidates every session on every
+    device.
+  - Secrets (bcrypt password hash + signing key) live in `../todo-auth/config.php`
+    **outside the web root** — never in the repo. `auth.php` only reads them.
+
+### Added
+- `auth.php`, `login.php`, `logout.php` — the cookie-session guard, form, and
+  logout.
+
+### Migration
+- `index.html` → `index.php` and `index-zh.html` → `index-zh.php` (the front door
+  must run PHP to enforce the guard). `sync.php` now calls `todo_require_auth()`
+  first and returns `401` without a valid cookie. `.htaccess` drops the Basic Auth
+  block, sets `DirectoryIndex index.php`, and 301-redirects stale `*.html` entry
+  URLs; the server `.htpasswd` was removed.
+
 ## [1.8.1] — 2026-06-29
 
 ### Fixed

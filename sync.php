@@ -13,10 +13,11 @@
  *   anything else  -> 405.
  *
  * SECURITY / DESIGN NOTES
- * - No auth code here on purpose. The whole site sits behind HTTP Basic Auth
- *   (Apache .htaccess); browsers auto-send those credentials on same-origin
- *   fetches, so every request reaching this script is already authenticated.
- *   Keep it that way — do NOT add permissive CORS headers; this is same-origin.
+ * - Auth is a shared cookie-session guard (auth.php): the first thing this
+ *   script does is todo_require_auth(), which 401s any request without a valid
+ *   signed cookie. The app front door (index.php) sets that cookie via login.php,
+ *   so same-origin fetches from the app carry it automatically.
+ *   Same-origin only — do NOT add permissive CORS headers.
  * - The state file lives OUTSIDE the web root (one level up from this script),
  *   so it can never be downloaded directly. The path is a fixed server-side
  *   constant, NEVER built from request input — there is no path-traversal vector.
@@ -24,6 +25,10 @@
  *   safe to commit to the public repo. Adjust STATE_DIR below only if your
  *   deployment puts the document root somewhere unusual.
  */
+
+// --- Auth gate (must be first) -----------------------------------------------
+require __DIR__ . '/auth.php';
+todo_require_auth();
 
 // --- Configuration -----------------------------------------------------------
 // One level above the web root (this script lives in the web root). Resolves to
