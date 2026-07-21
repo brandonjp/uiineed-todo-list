@@ -1,12 +1,20 @@
-# Example hardening for a PRIVATE static deployment behind Apache.
-# Copy to ".htaccess" on your server and fill in YOUR_HOME. Your real .htaccess is
-# gitignored so deployment specifics (paths, hosts) never land in this public repo.
+# Example hardening for a PRIVATE deployment behind Apache + PHP.
+# Copy to ".htaccess" on your server. Your real .htaccess is gitignored so
+# deployment specifics never land in this public repo.
+#
+# Auth is a cookie-session login (login.php + auth.php), NOT HTTP Basic Auth.
+# The secret bcrypt hash + signing key live OUTSIDE the web root in
+# ../todo-auth/config.php (see auth.php). Nothing secret goes in this file.
 
-# 1) Force HTTPS — Basic Auth credentials must never travel over plain HTTP.
+# 1) Force HTTPS — the login cookie is Secure-only; never let it touch plain HTTP.
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{HTTPS} !=on
     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Redirect stale *.html entry URLs (old bookmarks / home-screen shortcuts).
+    RewriteRule ^index\.html$      /            [L,R=301]
+    RewriteRule ^index-zh\.html$   /index-zh.php [L,R=301]
 </IfModule>
 
 # 2) Keep crawlers out at the header level (defense in depth w/ robots.txt + meta).
@@ -14,14 +22,10 @@
     Header set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet"
 </IfModule>
 
-# 3) HTTP Basic Auth — no anonymous access. AuthUserFile must be an ABSOLUTE path,
-#    ideally OUTSIDE the web root. Create it with:  htpasswd -cB <abs-path> <user>
-AuthType Basic
-AuthName "Restricted"
-AuthUserFile /home/YOUR_HOME/.htpasswd
-Require valid-user
+# 3) PHP is the front door — serve index.php as the directory index.
+DirectoryIndex index.php index.html
 
-# 4) Never serve dotfiles (.htaccess, .htpasswd, .git, ...).
+# 4) Never serve dotfiles (.htaccess, .git, ...).
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>

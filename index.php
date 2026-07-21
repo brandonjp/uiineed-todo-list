@@ -1,10 +1,11 @@
- <!DOCTYPE html>
+<?php require __DIR__ . '/auth.php'; todo_require_auth(); ?>
+<!DOCTYPE html>
 <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="version" content="1.8.1">
+        <meta name="version" content="1.9.0">
         <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
         <title>Todo List Online - Minimalist, No-Login Required Web Todo App</title>
         <meta
@@ -15,21 +16,21 @@
             content="uiineed's Todo List Online is a minimalist, no-login-required web app that helps you manage your tasks and schedules effortlessly. Store your todos securely in your browser's local cache, and enjoy a seamless experience without the hassle of sign-ups or logins. Perfect for both personal and professional use!">
         <link type="favicon" rel="shortcut icon" href="public/img/favicon.png"/>
         <link href="public/css/normalize.css" rel="stylesheet" media="screen">
-        <link href="public/css/style.min.css?v=1.8.1" rel="stylesheet" media="screen">
+        <link href="public/css/style.min.css?v=1.9.0" rel="stylesheet" media="screen">
         <script>
             // Automatically detect and switch language
             const browserLanguage = navigator.language || navigator.userLanguage;
             const languageCode = browserLanguage.split('-')[0].toLowerCase();
             if (!localStorage.getItem('uiineed-todos-lang')) localStorage.setItem('uiineed-todos-lang', languageCode);
             const userLanguage = localStorage.getItem('uiineed-todos-lang');
-            if (userLanguage && userLanguage === "zh") window.location.href = (window.location.pathname === "/") ? 'index-zh.html' : window.location.href.replace('index.html', 'index-zh.html');
+            if (userLanguage && userLanguage === "zh") window.location.href = (window.location.pathname === "/") ? 'index-zh.php' : window.location.href.replace('index.php', 'index-zh.php');
         </script>
         <style>[v-cloak]{display:none}</style>
         <!-- Vue 2.x Todo List -->
         <!-- <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script> -->
         <script>window.UIINEED_LANG = 'en';</script>
         <script src="public/js/vue.js"></script>
-        <script src="public/js/i18n.js?v=1.8.1"></script>
+        <script src="public/js/i18n.js?v=1.9.0"></script>
     </head>
 
     <body>
@@ -453,13 +454,13 @@
                     <div class="language switch-language">
                         <a href="javascript:void(0)" class="en active" draggable="false">En</a>
                         <span>/</span>
-                        <a href="index-zh.html" target="_self" class="zh" draggable="false" @click="saveLanguage('zh')">中</a>
+                        <a href="index-zh.php" target="_self" class="zh" draggable="false" @click="saveLanguage('zh')">中</a>
                     </div>
                 </div>
 
             </div>
         </div>
-        <script src="public/js/app.js?v=1.8.1"></script>
+        <script src="public/js/app.js?v=1.9.0"></script>
     </body>
 
 </html>
