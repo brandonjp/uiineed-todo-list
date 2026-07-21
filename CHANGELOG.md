@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.9.2] — 2026-07-21
+
+### Changed
+- **Logout is now an icon, not a stray text link.** The v1.9.1 "Sign out" text
+  landed as a cramped, misaligned word inside the floating top `.nav` cluster.
+  Replaced it with a proper logout icon (`public/img/social/logout.svg`, Font
+  Awesome "right-from-bracket" to match the existing GitHub glyph) using the same
+  `.github`/`.social-link`/`.ic-social` markup, so it renders identically — a
+  20px icon at the right end of the cluster, with the same hover behaviour.
+
 ## [1.9.1] — 2026-07-21
 
 ### Added
