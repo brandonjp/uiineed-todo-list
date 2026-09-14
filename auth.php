@@ -23,12 +23,23 @@
 define('TODO_AUTH_COOKIE', 'todo_auth');
 define('TODO_AUTH_REMEMBER_SECONDS', 365 * 24 * 60 * 60); // 1 year
 
-/** Load the secret config from OUTSIDE the web root (cached per request). */
+/**
+ * Load the secret config from OUTSIDE the web root (cached per request).
+ *
+ * TODO_AUTH_CONFIG_PATH is a server-set environment variable (never derived
+ * from request input, so it is not attacker-reachable) that lets
+ * test/auth.test.php point this at a throwaway fixture instead of the real
+ * one-level-above-webroot path. Unset in every real deployment, where this
+ * always resolves to the documented path.
+ */
 function todo_auth_config() {
     static $cfg = null;
     if ($cfg === null) {
-        $path = dirname(__DIR__) . '/todo-auth/config.php';
-        $cfg  = is_file($path) ? require $path : array();
+        $path = getenv('TODO_AUTH_CONFIG_PATH');
+        if ($path === false || $path === '') {
+            $path = dirname(__DIR__) . '/todo-auth/config.php';
+        }
+        $cfg = is_file($path) ? require $path : array();
     }
     return $cfg;
 }
@@ -76,6 +87,28 @@ function todo_set_cookie($remember) {
     ));
 }
 
+/**
+ * Display name for this deployment. Never hardcoded — resolved per request.
+ *
+ * Order: an explicit `site_name` in the out-of-web-root config, else the
+ * request's own Host header, else a neutral fallback.
+ *
+ * NOTE: HTTP_HOST is client-controlled. The return value is therefore for
+ * DISPLAY ONLY and every caller MUST escape it. It is never used to build a
+ * URL, a redirect target, or a cookie domain — all redirects in this codebase
+ * are relative (`Location: index.php`). As defense in depth, a Host value
+ * containing anything outside hostname characters is rejected outright rather
+ * than trusted to escaping alone.
+ */
+function todo_site_name() {
+    $cfg = todo_auth_config();
+    if (!empty($cfg['site_name'])) return $cfg['site_name'];
+    if (!empty($_SERVER['HTTP_HOST']) && preg_match('/^[A-Za-z0-9.:-]+$/', $_SERVER['HTTP_HOST'])) {
+        return $_SERVER['HTTP_HOST'];
+    }
+    return 'Todo';
+}
+
 /** Clear the auth cookie (logout). */
 function todo_clear_cookie() {
     setcookie(TODO_AUTH_COOKIE, '', array(
@@ -85,6 +118,43 @@ function todo_clear_cookie() {
         'httponly' => true,
         'samesite' => 'Lax',
     ));
+}
+
+/** Extract the bearer token from the request, or '' if absent. */
+function todo_bearer_token() {
+    // Apache with PHP as CGI/FastCGI strips Authorization unless it is
+    // explicitly passed through — see .htaccess.example for the required
+    // RewriteRule / CGIPassAuth line.
+    $hdr = '';
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        $hdr = $_SERVER['HTTP_AUTHORIZATION'];
+    } elseif (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $hdr = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+    if (stripos($hdr, 'Bearer ') !== 0) return '';
+    return trim(substr($hdr, 7));
+}
+
+/**
+ * Name of the API token presented in this request, or null if none matched
+ * (including when no api_tokens are configured at all — token auth is
+ * opt-in). Constant-time: every configured token is checked even after a
+ * match, so response time cannot reveal how many tokens exist or where in
+ * the list a hit landed.
+ */
+function todo_api_identity() {
+    $cfg = todo_auth_config();
+    if (empty($cfg['api_tokens']) || !is_array($cfg['api_tokens'])) return null;
+
+    $token = todo_bearer_token();
+    if ($token === '') return null;
+    $presented = hash('sha256', $token);
+
+    $found = null;
+    foreach ($cfg['api_tokens'] as $name => $expected) {
+        if (hash_equals((string) $expected, $presented)) $found = $name;
+    }
+    return $found;
 }
 
 /**

@@ -20,23 +20,19 @@
  *   Same-origin only — do NOT add permissive CORS headers.
  * - The state file lives OUTSIDE the web root (one level up from this script),
  *   so it can never be downloaded directly. The path is a fixed server-side
- *   constant, NEVER built from request input — there is no path-traversal vector.
+ *   constant in store.php, NEVER built from request input — there is no
+ *   path-traversal vector.
+ * - Storage (path, locking, atomic write) is shared with api.php via
+ *   store.php. This file's own behaviour — routes, responses, whole-blob
+ *   overwrite semantics — is unchanged from before that extraction.
  * - This file is intentionally generic (no host/URL/path specifics) so it is
- *   safe to commit to the public repo. Adjust STATE_DIR below only if your
- *   deployment puts the document root somewhere unusual.
+ *   safe to commit to the public repo.
  */
 
 // --- Auth gate (must be first) -----------------------------------------------
 require __DIR__ . '/auth.php';
 todo_require_auth();
-
-// --- Configuration -----------------------------------------------------------
-// One level above the web root (this script lives in the web root). Resolves to
-// e.g. ~/todo-sync when the site is served from ~/yourdomain.tld. Override here
-// if your layout differs — it must point somewhere OUTSIDE the web root.
-define('STATE_DIR', dirname(__DIR__) . '/todo-sync');
-define('STATE_FILE', STATE_DIR . '/state.json');
-define('MAX_BYTES', 5 * 1024 * 1024); // 5 MB hard cap on a stored blob
+require __DIR__ . '/store.php';
 
 // --- Helpers -----------------------------------------------------------------
 function send_json($status, $payload) {
@@ -52,17 +48,16 @@ function send_json($status, $payload) {
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 
 if ($method === 'GET' || $method === 'HEAD') {
-    if (is_file(STATE_FILE)) {
+    if ($method === 'HEAD') {
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
         header('X-Robots-Tag: noindex, nofollow');
-        if ($method !== 'HEAD') {
-            readfile(STATE_FILE);
-        }
         exit;
     }
-    // Nothing stored yet — a valid empty state the client understands.
-    send_json(200, '{"updatedAt":0}');
+    // todo_store_read() already returns the {"updatedAt":0} empty shape when
+    // nothing has been saved yet, so GET behaves identically pre- and
+    // post-extraction.
+    send_json(200, todo_store_read());
 }
 
 if ($method === 'PUT' || $method === 'POST') {
@@ -81,22 +76,19 @@ if ($method === 'PUT' || $method === 'POST') {
         send_json(400, array('ok' => false, 'error' => 'invalid JSON object'));
     }
 
-    if (!is_dir(STATE_DIR)) {
-        if (!@mkdir(STATE_DIR, 0700, true) && !is_dir(STATE_DIR)) {
-            send_json(500, array('ok' => false, 'error' => 'cannot create storage dir'));
-        }
-    }
-
-    // Atomic write: temp file in the same dir, then rename over the target so a
-    // concurrent reader never sees a half-written file.
-    $tmp = STATE_FILE . '.' . getmypid() . '.tmp';
-    if (file_put_contents($tmp, $raw, LOCK_EX) === false || !@rename($tmp, STATE_FILE)) {
-        @unlink($tmp);
+    // sync.php's contract is a whole-blob overwrite: whatever the browser
+    // sends REPLACES the stored blob, same as before the store.php
+    // extraction. The mutate callback ignores $current for exactly that
+    // reason — the lock still buys atomicity against a concurrent writer.
+    try {
+        $next = todo_store_mutate(function ($current) use ($data) {
+            return $data;
+        });
+    } catch (RuntimeException $e) {
         send_json(500, array('ok' => false, 'error' => 'write failed'));
     }
-    @chmod(STATE_FILE, 0600);
 
-    $updatedAt = isset($data['updatedAt']) ? $data['updatedAt'] : 0;
+    $updatedAt = isset($next['updatedAt']) ? $next['updatedAt'] : 0;
     send_json(200, array('ok' => true, 'updatedAt' => $updatedAt));
 }
 

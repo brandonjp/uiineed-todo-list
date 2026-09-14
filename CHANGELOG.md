@@ -4,6 +4,40 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.10.0] — 2026-09-14
+
+### Added
+- **Token-authenticated machine API (`api.php`).** A new bearer-token endpoint
+  alongside the browser's cookie-only `sync.php`, so non-browser clients can
+  read and write the todo list: `GET/POST ?resource=tasks`,
+  `PATCH/DELETE ?resource=tasks&id=<id>`. Reads and writes the same stored
+  blob `sync.php` serves, so a change from either side shows up in the other.
+  Tokens are named, SHA-256-hashed in the out-of-web-root config, and
+  revocable independently of the browser session. See
+  `docs/superpowers/specs/2026-09-08-api-and-mcp-design.md` for the full
+  design and threat model.
+- **Local stdio MCP server (`mcp/todo-mcp.mjs`).** Zero-dependency (no
+  `package.json`, hand-rolled JSON-RPC 2.0 over stdio) — exposes `list_tasks`,
+  `add_task`, `complete_task`, and `delete_task` as MCP tools, so an MCP
+  client can manage the list directly. Runs entirely on the local machine and
+  talks to `api.php` over HTTPS; nothing new is publicly reachable. Reads
+  `TODO_API_URL` / `TODO_API_TOKEN` from the environment or
+  `~/.config/creds/todo.env`.
+- `store.php` — shared, lock-protected storage extracted from `sync.php`, so
+  `api.php`'s read-modify-write requests can't interleave and lose a
+  concurrent write. `sync.php`'s own routes and whole-blob overwrite
+  semantics are unchanged.
+- `test/auth.test.php` — covers `todo_api_identity()` (token accept/reject,
+  header fallback, opt-in when unconfigured) and `todo_site_name()`'s
+  resolution order. Run with `php test/auth.test.php`.
+
+### Changed
+- **The site title is no longer hardcoded.** `login.php` showed a fixed
+  hostname in its `<title>`/`<h1>` — a deployment detail baked into public
+  source. It now resolves via `todo_site_name()`: an explicit `site_name` in
+  the out-of-web-root config, else the request's own (validated) `Host`
+  header, else a neutral "Todo" fallback.
+
 ## [1.9.2] — 2026-07-21
 
 ### Changed
