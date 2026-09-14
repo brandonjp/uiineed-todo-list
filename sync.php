@@ -8,8 +8,9 @@
  *
  *   GET            -> 200 application/json, the stored blob (or {"updatedAt":0}
  *                     when nothing has been saved yet).
- *   PUT  / POST    -> store the request body verbatim (after validating it is a
- *                     JSON object), 200 {"ok":true,"updatedAt":N}.
+ *   PUT  / POST    -> store the request body (after validating it is a JSON
+ *                     object sent as application/json — 415 otherwise),
+ *                     200 {"ok":true,"updatedAt":N}.
  *   anything else  -> 405.
  *
  * SECURITY / DESIGN NOTES
@@ -61,6 +62,11 @@ if ($method === 'GET' || $method === 'HEAD') {
 }
 
 if ($method === 'PUT' || $method === 'POST') {
+    // CSRF defense in depth — see todo_is_json_request() in auth.php. The app's
+    // syncPut() always sends application/json, so this rejects nothing real.
+    if (!todo_is_json_request()) {
+        send_json(415, array('ok' => false, 'error' => 'Content-Type must be application/json'));
+    }
     $raw = file_get_contents('php://input');
     if ($raw === false || strlen($raw) === 0) {
         send_json(400, array('ok' => false, 'error' => 'empty body'));

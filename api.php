@@ -15,6 +15,9 @@
  *   DELETE ?resource=tasks&id=<id>      -> moves the task to the recycle bin
  *   anything else                       -> 405 with an Allow header
  *
+ * Request bodies must be sent as `Content-Type: application/json` (415
+ * otherwise) — see todo_is_json_request() in auth.php for why.
+ *
  * SECURITY / DESIGN NOTES
  * - Auth: a valid bearer token (todo_api_identity()) OR a valid browser
  *   session cookie (todo_is_authed()) — the cookie path exists so this
@@ -51,14 +54,49 @@ function todo_gen_id($ms, $counter) {
     return 't' . base_convert((string) $ms, 10, 36) . '-' . base_convert((string) $counter, 10, 36);
 }
 
-/** Decode the JSON request body as an associative array, or null if it isn't
- *  one (missing body, invalid JSON, or a non-object top level). */
+/** A genId()-format id for $ms that no task in todos or recycleBin already
+ *  uses. The store lock serializes concurrent writes, but back-to-back
+ *  requests can still land in the same millisecond — so the counter is
+ *  bumped until the id is free, the same job genId()'s counter does. */
+function todo_unique_id($ms, $current) {
+    $taken = array();
+    foreach (array('todos', 'recycleBin') as $key) {
+        if (empty($current[$key]) || !is_array($current[$key])) continue;
+        foreach ($current[$key] as $t) {
+            if (is_array($t) && isset($t['id'])) $taken[(string) $t['id']] = true;
+        }
+    }
+    $counter = 0;
+    while (isset($taken[todo_gen_id($ms, $counter)])) $counter++;
+    return todo_gen_id($ms, $counter);
+}
+
+/** The `updatedAt` for a write: now, but always above the stored stamp —
+ *  mirrors nextStamp() in app.js. Without the floor, a browser whose clock
+ *  runs ahead of the server's leaves a stamp an API write can undercut, and
+ *  that browser's next planSync() would push its older snapshot over the
+ *  API's change as if it were newer. */
+function todo_next_stamp($current) {
+    $now = (int) round(microtime(true) * 1000);
+    $stored = (isset($current['updatedAt']) && is_numeric($current['updatedAt'])) ? (int) $current['updatedAt'] : 0;
+    return $now > $stored ? $now : $stored + 1;
+}
+
+/** Decode the JSON request body as an associative array (empty body → empty
+ *  array), or send the 415/413/400 that explains why it can't be. */
 function todo_api_body() {
+    if (!todo_is_json_request()) {
+        todo_api_send(415, array('ok' => false, 'error' => 'Content-Type must be application/json'));
+    }
     $raw = file_get_contents('php://input');
     if ($raw === false || $raw === '') return array();
-    if (strlen($raw) > MAX_BYTES) return null;
+    if (strlen($raw) > MAX_BYTES) {
+        todo_api_send(413, array('ok' => false, 'error' => 'payload too large'));
+    }
     $data = json_decode($raw, true);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) return null;
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+        todo_api_send(400, array('ok' => false, 'error' => 'invalid JSON object'));
+    }
     return $data;
 }
 
@@ -78,12 +116,9 @@ if ($method === 'GET') {
 
 if ($method === 'POST') {
     $body = todo_api_body();
-    if ($body === null) {
-        todo_api_send(400, array('ok' => false, 'error' => 'invalid JSON object'));
-    }
-    $title = isset($body['title']) ? (string) $body['title'] : '';
+    $title = (isset($body['title']) && is_string($body['title'])) ? trim($body['title']) : '';
     if ($title === '') {
-        todo_api_send(400, array('ok' => false, 'error' => 'title is required'));
+        todo_api_send(400, array('ok' => false, 'error' => 'title must be a non-empty string'));
     }
 
     $newTask = null;
@@ -91,7 +126,7 @@ if ($method === 'POST') {
         $next = todo_store_mutate(function ($current) use ($title, &$newTask) {
             $ms = (int) round(microtime(true) * 1000);
             $newTask = array(
-                'id'        => todo_gen_id($ms, 0),
+                'id'        => todo_unique_id($ms, $current),
                 'title'     => $title,
                 'completed' => false,
                 'removed'   => false,
@@ -103,7 +138,7 @@ if ($method === 'POST') {
             if (!isset($current['recycleBin']) || !is_array($current['recycleBin'])) {
                 $current['recycleBin'] = array();
             }
-            $current['updatedAt'] = $ms;
+            $current['updatedAt'] = todo_next_stamp($current);
             return $current;
         });
     } catch (RuntimeException $e) {
@@ -119,11 +154,14 @@ if ($method === 'PATCH') {
         todo_api_send(400, array('ok' => false, 'error' => 'id is required'));
     }
     $body = todo_api_body();
-    if ($body === null) {
-        todo_api_send(400, array('ok' => false, 'error' => 'invalid JSON object'));
-    }
     if (!array_key_exists('completed', $body) && !array_key_exists('title', $body)) {
         todo_api_send(400, array('ok' => false, 'error' => 'nothing to update'));
+    }
+    if (array_key_exists('completed', $body) && !is_bool($body['completed'])) {
+        todo_api_send(400, array('ok' => false, 'error' => 'completed must be a boolean'));
+    }
+    if (array_key_exists('title', $body) && (!is_string($body['title']) || trim($body['title']) === '')) {
+        todo_api_send(400, array('ok' => false, 'error' => 'title must be a non-empty string'));
     }
 
     $updated = null;
@@ -132,14 +170,14 @@ if ($method === 'PATCH') {
             $todos = isset($current['todos']) && is_array($current['todos']) ? $current['todos'] : array();
             foreach ($todos as $i => $t) {
                 if (!isset($t['id']) || (string) $t['id'] !== $id) continue;
-                if (array_key_exists('completed', $body)) $t['completed'] = !!$body['completed'];
-                if (array_key_exists('title', $body)) $t['title'] = (string) $body['title'];
+                if (array_key_exists('completed', $body)) $t['completed'] = $body['completed'];
+                if (array_key_exists('title', $body)) $t['title'] = trim($body['title']);
                 $todos[$i] = $t;
                 $updated = $t;
                 break;
             }
             $current['todos'] = $todos;
-            if ($updated !== null) $current['updatedAt'] = (int) round(microtime(true) * 1000);
+            if ($updated !== null) $current['updatedAt'] = todo_next_stamp($current);
             return $current;
         });
     } catch (RuntimeException $e) {
@@ -176,7 +214,7 @@ if ($method === 'DELETE') {
                 $bin = isset($current['recycleBin']) && is_array($current['recycleBin']) ? $current['recycleBin'] : array();
                 array_unshift($bin, $removed);
                 $current['recycleBin'] = $bin;
-                $current['updatedAt'] = (int) round(microtime(true) * 1000);
+                $current['updatedAt'] = todo_next_stamp($current);
             }
             return $current;
         });

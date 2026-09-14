@@ -7,8 +7,8 @@
  * Talks to api.php (docs/superpowers/specs/2026-09-08-api-and-mcp-design.md)
  * over HTTPS using a bearer token. Runs entirely on this machine — nothing
  * new is publicly reachable. Zero dependencies: hand-rolled
- * newline-delimited JSON-RPC 2.0 over stdio, implementing only the three
- * methods a client actually needs (initialize, tools/list, tools/call). No
+ * newline-delimited JSON-RPC 2.0 over stdio, implementing only what a client
+ * actually needs (initialize, ping, tools/list, tools/call). No
  * package.json, no @modelcontextprotocol/sdk — matches this project's
  * build-free convention (Vue vendored as a file, tests run as plain node).
  * Tradeoff, stated plainly: the SDK tracks MCP protocol revisions
@@ -32,8 +32,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SERVER_NAME = 'uiineed-todo-mcp';
-const SERVER_VERSION = '1.0.0';
+const SERVER_VERSION = '1.0.1';
 const PROTOCOL_VERSION = '2024-11-05';
+const API_TIMEOUT_MS = 15000; // a hung request otherwise hangs the tool call forever
 
 // ---- Credentials ------------------------------------------------------------
 
@@ -83,6 +84,7 @@ async function apiCall(method, extraParams, body) {
             'Content-Type': 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
 
     const text = await res.text();
@@ -197,6 +199,10 @@ async function handle(msg) {
             return;
         }
         if (method === 'notifications/initialized') {
+            return;
+        }
+        if (method === 'ping') { // MCP liveness check; must answer with an empty result
+            sendResult(id, {});
             return;
         }
         if (method === 'tools/list') {

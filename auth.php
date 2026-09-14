@@ -136,6 +136,24 @@ function todo_bearer_token() {
 }
 
 /**
+ * True when the request declares a JSON body. Write endpoints require it as
+ * CSRF defense in depth: a cross-origin page can send a body without a CORS
+ * preflight only as text/plain, form-urlencoded, or multipart — never
+ * application/json — and nothing here answers a preflight. The session cookie
+ * alone doesn't prove a request came from the app, because SameSite=Lax still
+ * sends it from any sibling subdomain (same *site*, different origin).
+ */
+function todo_is_json_request() {
+    $type = '';
+    if (!empty($_SERVER['CONTENT_TYPE'])) {
+        $type = $_SERVER['CONTENT_TYPE'];
+    } elseif (!empty($_SERVER['HTTP_CONTENT_TYPE'])) {
+        $type = $_SERVER['HTTP_CONTENT_TYPE'];
+    }
+    return stripos(trim($type), 'application/json') === 0;
+}
+
+/**
  * Name of the API token presented in this request, or null if none matched
  * (including when no api_tokens are configured at all — token auth is
  * opt-in). Constant-time: every configured token is checked even after a

@@ -508,3 +508,41 @@ release. An independent reviewer pass plus targeted verification. Fixes below ar
 ### Remaining planned work (unchanged from §7)
 - **MOB-2…MOB-5** mobile polish + PWA manifest (Phase 3 remainder).
 - **Sync Option A** (hosted Worker + KV "Sync ID") — deferred.
+
+---
+
+## 11. API + MCP review (2026-09-14, v1.10.1)
+
+Review of the v1.10.0 token API (`api.php`), shared storage (`store.php`), and local
+MCP server (`mcp/todo-mcp.mjs`), verified live against a multi-worker `php -S`. That
+verification is now committed as `bash test/api.e2e.sh`. Design:
+`docs/superpowers/specs/2026-09-08-api-and-mcp-design.md`.
+
+### Fixed this pass
+- 🔴 **Duplicate task ids under concurrent writes.** Every API id used counter `0`, so
+  adds in the same millisecond collided (20 concurrent → 18 unique; 8 parallel MCP
+  `add_task` → 6). `complete_task`/`delete_task` then hit the first duplicate, and the
+  browser's `loadState()` re-ids duplicates, invalidating ids Claude already holds.
+- 🟠 **Fast browser clock could undercut an API write.** `updatedAt` now floors at
+  stored + 1 (`todo_next_stamp()`, mirroring `nextStamp()`), so the browser's next
+  `planSync()` pulls the API change instead of pushing over it.
+- 🟡 **Validation.** Non-string titles were stored as `"Array"` with a PHP warning in
+  the response body; blank titles and non-boolean `completed` were accepted. Now 400.
+- 🟡 **CSRF defense in depth.** `api.php` + `sync.php` writes require
+  `Content-Type: application/json`. SameSite=Lax sends the cookie from sibling
+  subdomains, and a `text/plain` POST needs no preflight.
+- 🟢 MCP answers `ping`; API calls time out at 15 s; stored JSON is unescaped.
+
+### ⬜ Follow-ups
+1. **An open tab silently erases API changes — REVIEW-3, owner's call, still open.**
+   `runSync()` runs only on page load and manual "Sync now"; a local edit pushes the
+   tab's whole blob without checking the server. Claude adds a task → you tick a box in
+   a tab or home-screen PWA opened before that → Claude's task is gone, no conflict
+   shown. Cheap mitigation: re-run `runSync()` on `visibilitychange` (covers a phone
+   waking). Full fix: `sync.php` 409s a PUT whose base `updatedAt` isn't the stored
+   one, and the client pulls + merges before retrying.
+2. **Not deployed.** Live steps (mint token, confirm the `Authorization` header reaches
+   PHP on the host, register the MCP server) are in git-ignored `DEPLOY.local.md` →
+   "API + MCP". Deploy v1.10.1, not v1.10.0.
+3. **MCP protocol pinned to `2024-11-05`** (hand-rolled server, no SDK). If a Claude
+   Code release drops that revision, `initialize` fails — bump `PROTOCOL_VERSION`.
