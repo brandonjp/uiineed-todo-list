@@ -63,7 +63,10 @@ function todo_store_mutate($fn) {
         if (!is_array($next)) {
             throw new RuntimeException('mutation callback did not return an array');
         }
-        $json = json_encode($next);
+        // Unescaped so the stored file stays byte-close to what the browser
+        // sent: default escaping turns each CJK character into a 6-byte
+        // \uXXXX, which could push a body under the raw MAX_BYTES check over it.
+        $json = json_encode($next, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             throw new RuntimeException('failed to encode state');
         }

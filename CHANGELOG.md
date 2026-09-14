@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.10.1] — 2026-09-14
+
+### Fixed
+- **Duplicate task ids from concurrent API writes.** Every API-created id used
+  counter `0`, so two adds in the same millisecond collided (20 concurrent adds
+  produced 18 unique ids; 8 parallel MCP `add_task` calls produced 6), and
+  `complete_task`/`delete_task` then acted on whichever duplicate came first.
+  Ids are now guaranteed unique across `todos` + `recycleBin`.
+- **An API write could be silently overwritten by a browser with a fast
+  clock.** `updatedAt` was the server's raw clock, so it could land below a
+  stamp a browser had just stored, and that browser's next sync would push its
+  older copy over the API change. Writes now always stamp above the stored
+  value, mirroring the client's `nextStamp()`.
+- **API input validation.** A non-string `title` was stored as `"Array"` with a
+  PHP warning printed into the JSON response; blank titles and non-boolean
+  `completed` were accepted. All three now return 400.
+
+### Security
+- `api.php` and `sync.php` writes now require `Content-Type: application/json`
+  (415 otherwise). A cross-origin `text/plain` POST needs no CORS preflight, and
+  SameSite=Lax still sends the session cookie from sibling subdomains — so a
+  page on one could previously add a task, or overwrite the whole list through
+  `sync.php`. The app already sends JSON, so nothing legitimate is rejected.
+
+### Changed
+- MCP server (1.0.1) answers `ping` and times out API requests after 15 s.
+- Stored JSON is written without `\uXXXX`/`\/` escaping.
+- `test/api.e2e.sh` — end-to-end suite against a throwaway multi-worker
+  `php -S`: auth, validation, sync.php/api.php interop, clock skew, concurrent
+  id uniqueness, and the MCP server over stdio. Run with `bash test/api.e2e.sh`.
+
 ## [1.10.0] — 2026-09-14
 
 ### Added

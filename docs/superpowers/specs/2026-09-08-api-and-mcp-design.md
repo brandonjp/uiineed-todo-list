@@ -281,9 +281,12 @@ Note `base_convert()` is lossy above 2^53; millisecond timestamps are ~2^41, so
 this is safe until the year 3084. Verified 2026-09-08: for ms=1757000000000, counter=5, both JS `genId()` and the PHP above produce `tmf5kfojk-5`, and it round-trips through the client's `idTime()` regex. New tasks also get `createdAt` set to the same
 millisecond value, matching `backfillCreatedAt()`'s expectations.
 
-Every mutating request sets `updatedAt` to the current millisecond timestamp,
-which is what makes the browser's existing `planSync()` pull the remote copy on
-next load. **This is the one piece that must not be got wrong** — an API write
+Every mutating request sets `updatedAt` to the current millisecond timestamp —
+floored at the stored value + 1, since v1.10.1, so a browser whose clock runs
+ahead can't leave a stamp the API undercuts — which is what makes the browser's
+existing `planSync()` pull the remote copy on next load. (Also since v1.10.1, the
+id counter is bumped past any id already in use: the store lock serializes
+writes, but two can still land in the same millisecond.) **This is the one piece that must not be got wrong** — an API write
 that leaves `updatedAt` stale would be silently discarded by the next browser
 sync.
 
