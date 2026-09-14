@@ -45,7 +45,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <meta name="theme-color" content="#f7f7f7">
-    <title>todo.bpf.fyi — sign in</title>
+    <title><?php echo htmlspecialchars(todo_site_name(), ENT_QUOTES, 'UTF-8'); ?> — sign in</title>
     <link rel="shortcut icon" href="public/img/favicon.png">
     <style>
         * { box-sizing: border-box; }
@@ -80,7 +80,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 </head>
 <body>
     <form class="card" method="post" action="login.php" autocomplete="on">
-        <h1>todo.bpf.fyi</h1>
+        <h1><?php echo htmlspecialchars(todo_site_name(), ENT_QUOTES, 'UTF-8'); ?></h1>
         <p class="sub">Private todo list — please sign in.</p>
         <?php if ($error): ?><div class="error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 

@@ -29,3 +29,14 @@ DirectoryIndex index.php index.html
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>
+
+# 5) Pass the Authorization header through to PHP — needed for api.php's
+#    bearer-token auth. Apache running PHP as CGI/FastCGI drops this header
+#    before PHP ever sees it, which fails confusingly: the code is correct,
+#    the token is correct, and every request still 401s.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+# Apache 2.4.13+ alternative, if mod_rewrite is unavailable:
+# CGIPassAuth On

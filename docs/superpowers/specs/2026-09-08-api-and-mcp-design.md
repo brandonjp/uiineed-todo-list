@@ -1,8 +1,17 @@
 # API + MCP access for the Uiineed Todo List — design proposal
 
-**Status:** proposed 2026-09-08, awaiting review · **Target:** the existing PHP
-deployment (Apache + PHP 8.2, shared hosting) · **Repo:** public fork of
+**Status:** implemented 2026-09-14 (v1.10.0), verified locally against `php
+-S`; not yet deployed to production — see `DEPLOY.local.md` → "API + MCP" for
+the remaining live-deployment steps · **Target:** the existing PHP deployment
+(Apache + PHP 8.2, shared hosting) · **Repo:** public fork of
 `ricocc/uiineed-todo-list`
+
+**Review resolutions:** REVIEW-2's Host-header whitelist was adopted (see
+`todo_site_name()` in `auth.php`) — cheap defense in depth, as the doc itself
+argued. REVIEW-3's stale-tab race is still accepted as documented, not
+resolved with `If-Match`. REVIEW-1 holds: the only new secret is
+`api_tokens`, stored as additional keys in the existing out-of-web-root
+config; nothing deployment-specific landed in source.
 
 **Reviewer:** you are being asked to poke holes in the *security model* and the
 *deployment story*, not the code style. The three questions worth your attention

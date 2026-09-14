@@ -361,4 +361,19 @@ test('planSync: garbage/non-object remote is treated as no data', function () {
     assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: true }, undefined).action, 'push');
 });
 
+// ---- PHP id-format cross-check -------------------------------------------
+// api.php mints ids with todo_gen_id($ms, $counter) = 't' + base_convert($ms,
+// 10, 36) . '-' . base_convert($counter, 10, 36) — deliberately matching
+// genId()'s format so idTime() parses API-created tasks the same way it
+// parses browser-created ones. PHP's base_convert(10, 36) and JS's
+// Number.prototype.toString(36) are the same algorithm, so this reproduces
+// the PHP formula without shelling out, keeping the suite zero-dependency.
+test('idTime: parses an id in the PHP todo_gen_id() format', function () {
+    var ms = 1757000000000, counter = 5;
+    var phpStyleId = 't' + ms.toString(36) + '-' + counter.toString(36);
+    // Verified 2026-09-08 against the actual PHP base_convert() output.
+    assert.strictEqual(phpStyleId, 'tmf5kfojk-5');
+    assert.strictEqual(core.idTime(phpStyleId), ms);
+});
+
 console.log('\nAll ' + passed + ' tests passed.');
