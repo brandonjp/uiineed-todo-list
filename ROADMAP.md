@@ -577,8 +577,11 @@ verification is now committed as `bash test/api.e2e.sh`. Design:
 3. **MCP protocol pinned to `2024-11-05`** (hand-rolled server, no SDK). If a Claude
    Code release drops that revision, `initialize` fails — bump `PROTOCOL_VERSION`.
 4. ⬜ **Delete the pre-deploy backups on the host — on or after 2026-09-22.** They
-   don't expire on their own. Kept a week so v1.10.2 can be rolled back if something
-   surfaces; about 450 KB total. Exact paths and the delete command are in git-ignored
-   `DEPLOY.local.md` → "API + MCP" (three files: the web-root tarball, the list-data
-   backup, the pre-`api_tokens` auth config). Before deleting, confirm the live list
-   still loads on your devices.
+   don't expire on their own. Kept a week so a bad release can be rolled back; about
+   900 KB across **five** files now. Exact paths and the delete commands are in
+   git-ignored `DEPLOY.local.md`:
+   - "API + MCP" — the v1.10.2 set (web-root tarball, list-data backup, the
+     pre-`api_tokens` auth config).
+   - "Sync conflict check (v1.11.0)" — `state.json.bak-2026-09-15-pre-v1.11.0` and
+     `todo.bpf.fyi-pre-v1.11.0-2026-09-15.tgz`, taken before the 2026-09-15 deploy.
+   Before deleting, confirm the live list still loads on your devices.
