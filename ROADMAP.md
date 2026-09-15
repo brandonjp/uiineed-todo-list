@@ -555,8 +555,9 @@ verification is now committed as `bash test/api.e2e.sh`. Design:
      tasks deleted on either side.
    - Tests: a stale-base PUT → 409 case in `test/api.e2e.sh`; pure three-way-merge
      cases in `test/logic.test.js` (add/add, delete/edit, delete/delete).
-2. **Not deployed.** Live steps (mint token, confirm the `Authorization` header reaches
-   PHP on the host, register the MCP server) are in git-ignored `DEPLOY.local.md` →
-   "API + MCP". Deploy v1.10.1, not v1.10.0.
+2. ✅ **Deployed 2026-09-15 (v1.10.2).** Token minted, `Authorization` header confirmed
+   reaching PHP on the host, MCP server registered in Claude Code as `todo`, live data
+   verified identical to the pre-deploy backup. Details, backups, and rollback are in
+   git-ignored `DEPLOY.local.md` → "API + MCP".
 3. **MCP protocol pinned to `2024-11-05`** (hand-rolled server, no SDK). If a Claude
    Code release drops that revision, `initialize` fails — bump `PROTOCOL_VERSION`.

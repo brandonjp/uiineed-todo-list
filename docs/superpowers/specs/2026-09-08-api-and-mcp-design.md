@@ -1,8 +1,7 @@
 # API + MCP access for the Uiineed Todo List — design proposal
 
-**Status:** implemented 2026-09-14 (v1.10.0), verified locally against `php
--S`; not yet deployed to production — see `DEPLOY.local.md` → "API + MCP" for
-the remaining live-deployment steps · **Target:** the existing PHP deployment
+**Status:** implemented 2026-09-14 (v1.10.0), review fixes in v1.10.1–v1.10.2
+(`ROADMAP.md` §11), deployed to production 2026-09-15 · **Target:** the existing PHP deployment
 (Apache + PHP 8.2, shared hosting) · **Repo:** public fork of
 `ricocc/uiineed-todo-list`
 
