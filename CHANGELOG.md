@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] — 2026-09-15
+
+### Fixed
+- **A task added while you were mid-edit is no longer lost.** Saving sent your
+  whole list at once, so if anything else wrote while a tab held an unsent edit
+  — a task added through the API or the MCP server, or an edit on another
+  device — that write was buried. Each save now says which version of the list
+  it was based on; the server refuses it if something else has written since,
+  and the app merges the two before saving again. Both sides survive: your edit,
+  their task. Ticking a task off here while it was renamed there keeps both
+  changes, and a task you deleted stays deleted unless the other side had
+  actually edited it (in which case the edit is kept rather than thrown away).
+- **Cross-device sync no longer depends on device clocks agreeing.** It compares
+  versions instead of timestamps, so a device whose clock runs fast can't win an
+  argument it should have lost.
+
+### Note for devices that are already signed in
+The first sync after this update merges that device's list with the stored one
+rather than picking a winner. A tab left open on the old version can't save
+until it is reloaded — its unsaved edits stay on the device and go up after the
+reload.
+
 ## [1.10.2] — 2026-09-15
 
 ### Fixed

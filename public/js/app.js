@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.10.2';
+    var APP_VERSION = '1.11.0';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -31,6 +31,7 @@
     var SLOGAN_KEY = 'uiineed-slogan';
     var SETTINGS_KEY = 'uiineed-settings';
     var SYNC_KEY = 'uiineed-sync';          // local sync meta: { updatedAt, synced }
+    var SYNC_BASE_KEY = 'uiineed-sync-base'; // last-agreed snapshot: the merge ancestor
     var SYNC_ENDPOINT = 'sync.php';         // SAME-ORIGIN, relative — never hardcode a host
 
     // ---- Settings + theme ---------------------------------------------------
@@ -156,6 +157,36 @@
         }
     }
     function saveSyncMeta(m) { safeSet(SYNC_KEY, JSON.stringify(m)); }
+
+    // ---- Sync base snapshot (the three-way merge ancestor) ------------------
+    // The blob as it stood the last time this device and the server agreed. It
+    // does two jobs: every push names its `updatedAt` so the server can refuse
+    // a write based on a version it has moved on from, and merge3 needs it to
+    // tell an edit apart from a deletion. Kept in localStorage so it survives a
+    // reload; absent on a device whose last sync predates v1.11.0.
+    function loadSyncBase() {
+        try {
+            var b = JSON.parse(localStorage.getItem(SYNC_BASE_KEY) || 'null');
+            return (b && typeof b === 'object' && typeof b.updatedAt === 'number') ? b : null;
+        } catch (e) {
+            return null;
+        }
+    }
+    function setSyncBase(snapshot) {
+        syncBase = snapshot;
+        safeSet(SYNC_BASE_KEY, JSON.stringify(snapshot));
+    }
+    // A detached copy of a remote blob, coerced the way a pull coerces it, so
+    // the merge compares like with like (a missing `completed` and a stored
+    // `false` are the same thing, and neither side keeps a live reference).
+    function remoteSnapshot(remote) {
+        return {
+            updatedAt: (remote && typeof remote.updatedAt === 'number') ? remote.updatedAt : 0,
+            slogan: (remote && typeof remote.slogan === 'string') ? remote.slogan : '',
+            todos: sanitizeRemoteList(remote && remote.todos),
+            recycleBin: sanitizeRemoteList(remote && remote.recycleBin)
+        };
+    }
 
     // Coerce a remote list into clean todos, preserving createdAt (so newest/
     // oldest sort still works after a pull) and backfilling any that lack one.
@@ -359,6 +390,7 @@
             normKey: normKey,
             mergeImport: mergeImport,
             planSync: planSync,
+            merge3: merge3,
             genId: genId,
             fuzzyMatch: fuzzyMatch,
             searchActions: searchActions,
@@ -485,30 +517,163 @@
         return { added: added.length, updated: updated, skipped: skipped };
     }
 
-    // ---- Cross-device sync reconcile (last-write-wins) ----------------------
+    // ---- Three-way merge (sync conflict resolution) -------------------------
+    // Reconcile two sides that both moved. `base` is the snapshot this device
+    // and the server last agreed on, `local` is what this device holds now,
+    // `remote` is what the server holds now — each { slogan, todos, recycleBin }.
+    // Returns a NEW { slogan, todos, recycleBin }; nothing passed in is mutated.
+    //
+    // Why three-way rather than a union: a union resurrects tasks deleted on
+    // either side. Knowing the common ancestor is what distinguishes an edit
+    // from a deletion, so neither side's actual work is lost.
+    //   - tasks are matched by id across BOTH lists, so moving one to the
+    //     recycle bin is just another change to it, not a delete plus an add;
+    //   - per field (title, completed, which list it is in) the side that
+    //     differs from base wins; if both changed the same field, local wins,
+    //     because that is the copy the person is looking at;
+    //   - a task added on either side is kept;
+    //   - a task that vanished from one side (emptied out of the recycle bin)
+    //     is dropped only if the other side left it untouched — an edit beats
+    //     a delete;
+    //   - order follows local, with tasks local doesn't have in that list
+    //     prepended in remote's order, so arrivals land on top the way a
+    //     locally added task does;
+    //   - base = null means no known ancestor: keep everything from both
+    //     sides, local winning any clash.
+    function merge3(base, local, remote) {
+        var own = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+        function keyOf(t) { return (t && t.id != null) ? 'i:' + String(t.id) : 'k:' + normKey(t || {}); }
+        function index(state) {
+            var map = {};
+            ['todos', 'recycleBin'].forEach(function (name) {
+                var list = (state && Array.isArray(state[name])) ? state[name] : [];
+                list.forEach(function (t) {
+                    if (!t) return;
+                    var k = keyOf(t);
+                    if (own(map, k)) return;
+                    map[k] = {
+                        id: t.id,
+                        title: typeof t.title === 'string' ? t.title : '',
+                        completed: !!t.completed,
+                        removed: name === 'recycleBin',
+                        createdAt: typeof t.createdAt === 'number' ? t.createdAt : undefined
+                    };
+                });
+            });
+            return map;
+        }
+        function untouched(a, b) {
+            return a.title === b.title && a.completed === b.completed && a.removed === b.removed;
+        }
+
+        var b = index(base), l = index(local), r = index(remote), merged = {};
+        function resolve(k) {
+            var be = own(b, k) ? b[k] : null;
+            var le = own(l, k) ? l[k] : null;
+            var re = own(r, k) ? r[k] : null;
+            if (le && re) {
+                // No ancestor: stand remote in for it, which makes every local
+                // difference a local change — i.e. local wins a straight clash.
+                var anc = be || re;
+                var pick = function (field) { return le[field] !== anc[field] ? le[field] : re[field]; };
+                return {
+                    id: le.id,
+                    title: pick('title'),
+                    completed: pick('completed'),
+                    removed: pick('removed'),
+                    createdAt: le.createdAt != null ? le.createdAt : re.createdAt
+                };
+            }
+            var one = le || re;
+            if (!one) return null;
+            // On one side only: if it still matches the ancestor, the other side
+            // genuinely deleted it — honour that. Otherwise it was edited (or is
+            // new), and the edit beats the delete.
+            if (be && untouched(one, be)) return null;
+            return one;
+        }
+        [l, r].forEach(function (side) {
+            for (var k in side) {
+                if (!own(side, k) || own(merged, k)) continue;
+                var m = resolve(k);
+                if (m) merged[k] = m;
+            }
+        });
+
+        function ordered(removed) {
+            var name = removed ? 'recycleBin' : 'todos';
+            var localList = (local && Array.isArray(local[name])) ? local[name] : [];
+            var remoteList = (remote && Array.isArray(remote[name])) ? remote[name] : [];
+            var inLocal = {}, used = {}, out = [];
+            localList.forEach(function (t) { if (t) inLocal[keyOf(t)] = true; });
+            function push(t) {
+                var k = t ? keyOf(t) : null;
+                if (!k || used[k] || !own(merged, k) || merged[k].removed !== removed) return;
+                used[k] = true;
+                out.push(merged[k]);
+            }
+            remoteList.forEach(function (t) { if (t && !inLocal[keyOf(t)]) push(t); }); // arrivals on top
+            localList.forEach(push);
+            Object.keys(merged).forEach(function (k) { // moved between lists by the merge
+                if (!used[k] && merged[k].removed === removed) { used[k] = true; out.push(merged[k]); }
+            });
+            return out;
+        }
+
+        var baseSlogan = base ? base.slogan : (remote ? remote.slogan : undefined);
+        var localSlogan = local ? local.slogan : undefined;
+        var remoteSlogan = remote ? remote.slogan : undefined;
+        return {
+            slogan: (localSlogan !== baseSlogan) ? localSlogan
+                : ((typeof remoteSlogan === 'string' && remoteSlogan) ? remoteSlogan : localSlogan),
+            todos: ordered(false),
+            recycleBin: ordered(true)
+        };
+    }
+
+    // ---- Cross-device sync reconcile ---------------------------------------
     // Decide what this device should do when it sees the remote blob. Pure and
     // testable; the Vue layer carries out the chosen action.
-    //   local  = { updatedAt:Number, hasData:Boolean, synced:Boolean }
+    //   local  = { updatedAt:Number, hasData:Boolean, synced:Boolean,
+    //              baseAt:Number|null }  // the stored version this device last
+    //              pulled or pushed; null if it last synced before v1.11.0
     //   remote = parsed blob object, or null/garbage (treated as "no remote")
     //
-    // Blob-level LAST-WRITE-WINS — the deliberately "rudimentary" model: the
-    // newer whole snapshot wins, so deletions propagate too (a per-item merge
-    // would resurrect items deleted on the other device). The ONE exception is
-    // FIRST CONTACT on a device (synced=false) with a non-empty remote: we
-    // union via the tested mergeImport path so a device's pre-sync todos are
-    // never silently clobbered the first time it connects. After that, pure LWW.
+    // The decision is about VERSIONS, not clocks. This device is "dirty" when
+    // its data has moved on from the version it last synced; the server has
+    // "moved" when what it stores is no longer that version. Comparing both
+    // against a shared ancestor — rather than comparing two timestamps — is
+    // what lets a tab notice that someone else wrote while it was holding an
+    // edit, instead of pushing its whole copy over the top. It also can't be
+    // fooled by a device whose clock runs fast.
+    //   push   -> only this side moved; upload it.
+    //   pull   -> only the server moved; adopt it.
+    //   rebase -> both moved; three-way merge (merge3), then upload.
+    //   merge  -> first contact on this device; union via mergeImport.
+    //   none   -> nothing to do.
     function planSync(local, remote) {
         local = local || {};
         var localAt = typeof local.updatedAt === 'number' ? local.updatedAt : 0;
         var remoteAt = (remote && typeof remote.updatedAt === 'number') ? remote.updatedAt : 0;
+        var baseAt = typeof local.baseAt === 'number' ? local.baseAt : null;
         var remoteHasData = !!(remote && (
             (Array.isArray(remote.todos) && remote.todos.length) ||
             (Array.isArray(remote.recycleBin) && remote.recycleBin.length)
         ));
+        // An empty remote is treated as "nothing stored yet" rather than as a
+        // deletion of everything: a wiped or fresh state file must not be able
+        // to empty a device that still has the data.
         if (!remoteHasData) return { action: local.hasData ? 'push' : 'none' };
         if (!local.synced) return { action: 'merge' };
-        if (remoteAt > localAt) return { action: 'pull' };
-        if (localAt > remoteAt) return { action: 'push' };
+        // Synced before v1.11.0, so no ancestor was ever recorded: one merge
+        // with no ancestor (keep both sides, local wins a clash) gets this
+        // device onto the versioned scheme without risking either side's work.
+        if (baseAt === null) return { action: localAt === remoteAt ? 'none' : 'rebase' };
+        var dirty = localAt !== baseAt;
+        var moved = remoteAt !== baseAt;
+        if (dirty && moved) return { action: 'rebase' };
+        if (moved) return { action: 'pull' };
+        if (dirty) return { action: 'push' };
         return { action: 'none' };
     }
 
@@ -516,6 +681,7 @@
     var initial = loadState();
     var settings = loadSettings();
     var syncMeta = loadSyncMeta();
+    var syncBase = loadSyncBase(); // module-level: setSyncBase() keeps it current
     var sortPref = loadSort();
     applyTheme(settings.theme); // apply before mount to avoid a flash
 
@@ -878,6 +1044,9 @@
             touchData: function () {
                 if (this._applyingRemote) return;
                 this.syncUpdatedAt = nextStamp();
+                // Sync asks "is this still the version I last synced?", so a
+                // stamp that happened to equal it would read as no local change.
+                if (syncBase && this.syncUpdatedAt === syncBase.updatedAt) this.syncUpdatedAt++;
                 saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: this.syncSynced });
                 this.scheduleSyncPush();
             },
@@ -903,9 +1072,10 @@
             // reconcile before the user edits. Without this, a tab or home-screen
             // PWA synced only on load, so its next edit pushed a stale whole blob
             // over anything written since — another device's edits, or tasks
-            // added through api.php / the MCP server. Still last-write-wins: an
-            // edit made while a remote write lands between returns can overwrite
-            // it (ROADMAP §11 tracks the server-side conflict check for that).
+            // added through api.php / the MCP server. A write that lands while
+            // this tab holds an edit is no longer lost either: the push carries
+            // the version it was based on, and sync.php refuses it (409) if the
+            // server moved on, which sends us through the three-way merge.
             resyncOnReturn: function () {
                 // Unsent local edits are the newest intent: send them rather than
                 // risk pulling a remote copy over them.
@@ -926,6 +1096,10 @@
                 return {
                     version: 1,
                     updatedAt: this.syncUpdatedAt,
+                    // The stored version this push is based on. sync.php refuses
+                    // the write (409) if the server has moved on since, instead
+                    // of letting this whole-blob push bury what landed meanwhile.
+                    baseUpdatedAt: syncBase ? syncBase.updatedAt : 0,
                     slogan: this.slogan,
                     todos: this.todos,
                     recycleBin: this.recycleBin
@@ -945,35 +1119,116 @@
                     return res.json();
                 });
             },
-            syncPut: function (payload) {
+            // Takes an already-serialized body (so the caller keeps the exact
+            // bytes it sent) and resolves for ANY status: 409 is an expected
+            // answer to handle, not a failure. Only a network error rejects.
+            syncPut: function (body) {
                 return fetch(SYNC_ENDPOINT, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
+                    body: body,
                     cache: 'no-store',
                     credentials: 'same-origin'
                 }).then(function (res) {
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    return res.json();
+                    return res.json().catch(function () { return null; }).then(function (json) {
+                        return { ok: res.ok, status: res.status, json: json };
+                    });
                 });
             },
 
-            // Best-effort upload of the current local state.
+            // Upload the current local state. One PUT at a time: a second one
+            // sent while the first is in flight would name the same base and be
+            // refused, so a change made mid-flight just queues another round.
             pushSync: function () {
                 if (this.syncAvailable !== true) return Promise.resolve();
+                if (this._pushing) { this._pushAgain = true; return this._pushing; }
                 var self = this;
+                // Serialize once: this is both the request body and, once the
+                // server accepts it, the new ancestor — and the arrays it
+                // points at keep changing while the request is in flight.
+                var body = JSON.stringify(this.buildSyncPayload());
                 this.syncStatus = 'syncing';
-                return this.syncPut(this.buildSyncPayload()).then(function () {
+                this._pushing = this.syncPut(body).then(function (res) {
+                    if (res.status === 409) {
+                        self.resolveConflict(res.json && res.json.current);
+                        return;
+                    }
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    self._conflicts = 0;
+                    var sent = JSON.parse(body);
+                    delete sent.baseUpdatedAt; // bookkeeping, not part of the state
+                    setSyncBase(sent);
                     self.syncSynced = true;
                     self.syncLastAt = Date.now();
                     self.syncStatus = 'synced';
                     saveSyncMeta({ updatedAt: self.syncUpdatedAt, synced: true });
                 }).catch(function () {
-                    // Endpoint went away mid-session: stop auto-pushing until the
-                    // user explicitly retries via "Sync now".
+                    // Endpoint went away mid-session, or conflicts kept coming:
+                    // stop auto-pushing until the user retries via "Sync now".
                     self.syncAvailable = false;
                     self.syncStatus = 'error';
+                }).then(function () {
+                    self._pushing = null;
+                    if (!self._pushAgain) return;
+                    self._pushAgain = false;
+                    return self.pushSync();
                 });
+                return this._pushing;
+            },
+
+            // sync.php refused the push: another writer (api.php / the MCP
+            // server, another device, another tab) got there since this tab's
+            // ancestor. It hands back the blob it holds; reconcile against that
+            // and queue the retry. Capped so a pathological loop degrades to the
+            // ordinary "error" state instead of hammering the server.
+            resolveConflict: function (current) {
+                this._conflicts = (this._conflicts || 0) + 1;
+                if (this._conflicts > 3) throw new Error('sync conflict retry limit');
+                if (this.reconcile(current)) this._pushAgain = true;
+            },
+
+            // Act on the planSync decision for a remote blob — fetched by
+            // runSync, or handed back by a 409. Does the local half of the work
+            // and returns true when the result still has to be pushed.
+            reconcile: function (remote) {
+                var remoteAt = (remote && typeof remote.updatedAt === 'number') ? remote.updatedAt : 0;
+                var plan = planSync({
+                    updatedAt: this.syncUpdatedAt,
+                    hasData: !!(this.todos.length || this.recycleBin.length),
+                    synced: this.syncSynced,
+                    baseAt: syncBase ? syncBase.updatedAt : null
+                }, remote);
+
+                if (plan.action === 'pull') {
+                    this.applyRemote(remote);
+                    return false;
+                }
+                if (plan.action === 'none') {
+                    setSyncBase(remoteSnapshot(remote));
+                    this.syncSynced = true;
+                    saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: true });
+                    return false;
+                }
+                if (plan.action === 'merge') {
+                    this.mergeRemote(remote);
+                } else if (plan.action === 'rebase') {
+                    this.applyMerged(merge3(syncBase, {
+                        slogan: this.slogan,
+                        todos: this.todos,
+                        recycleBin: this.recycleBin
+                    }, remoteSnapshot(remote)));
+                }
+                // push / merge / rebase all upload on top of the version just
+                // seen, so that is the ancestor the push will be checked against.
+                setSyncBase(remoteSnapshot(remote));
+                // A merged or unioned result is a new version; so is a push whose
+                // stamp still reads as "same as the server".
+                if (plan.action !== 'push' || this.syncUpdatedAt === remoteAt) {
+                    this.syncUpdatedAt = Math.max(nextStamp(), remoteAt + 1);
+                }
+                this.syncSynced = true;
+                saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: true });
+                return true;
             },
 
             // Adopt the remote snapshot wholesale (blob last-write-wins on pull).
@@ -991,15 +1246,50 @@
                 this.recycleBin = recycle;
                 this.syncUpdatedAt = (typeof remote.updatedAt === 'number') ? remote.updatedAt : nextStamp();
                 this.syncSynced = true;
+                setSyncBase(remoteSnapshot(remote)); // we now agree with the server
                 saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: true });
                 this.$nextTick(function () { self._applyingRemote = false; });
             },
 
-            // First contact on this device: union local + remote (no data loss),
-            // then push the union up so other devices converge on it.
+            // Adopt a three-way merge result (reconcile drives the stamping and
+            // the push). Tasks this tab already has are updated in place rather
+            // than replaced, so an open title edit keeps pointing at its task.
+            applyMerged: function (merged) {
+                var self = this;
+                this._applyingRemote = true; // suppress touchData for these writes
+                var existing = {};
+                this.todos.concat(this.recycleBin).forEach(function (t) {
+                    if (t && t.id != null) existing[String(t.id)] = t;
+                });
+                function adopt(list, removed) {
+                    return list.map(function (m) {
+                        var t = (m.id != null && existing[String(m.id)]) || {};
+                        t.id = m.id;
+                        t.title = m.title;
+                        t.completed = m.completed;
+                        t.removed = removed;
+                        if (typeof m.createdAt === 'number') t.createdAt = m.createdAt;
+                        return t;
+                    });
+                }
+                var todos = adopt(merged.todos, false);
+                var recycle = adopt(merged.recycleBin, true);
+                if (typeof merged.slogan === 'string' && merged.slogan && merged.slogan !== this.slogan) {
+                    this.slogan = merged.slogan;
+                    safeSet(SLOGAN_KEY, merged.slogan);
+                }
+                this.todos = todos;
+                this.recycleBin = recycle;
+                this.$nextTick(function () { self._applyingRemote = false; });
+            },
+
+            // First contact on this device: union local + remote so no offline
+            // work is lost. Deduped by id and then by normalized title, because
+            // the two sides may have been built independently. The caller
+            // stamps the union and pushes it.
             mergeRemote: function (remote) {
                 var self = this;
-                this._applyingRemote = true; // we drive the push explicitly below
+                this._applyingRemote = true;
                 var todos = sanitizeRemoteList(remote.todos);
                 var recycle = sanitizeRemoteList(remote.recycleBin);
                 mergeImport(this.todos, todos);
@@ -1007,11 +1297,7 @@
                     mergeImport(this.recycleBin, recycle);
                     this.recycleBin.forEach(function (t) { t.removed = true; });
                 }
-                this.syncUpdatedAt = nextStamp(); // union is a new version, newer than remote
-                this.syncSynced = true;
-                saveSyncMeta({ updatedAt: this.syncUpdatedAt, synced: true });
                 this.$nextTick(function () { self._applyingRemote = false; });
-                return this.pushSync();
             },
 
             // Fetch the remote blob and act on the planSync decision.
@@ -1028,31 +1314,10 @@
                 return this.syncGet().then(function (remote) {
                     self.syncAvailable = true;
                     self.showSyncStatus = true;
-                    var plan = planSync({
-                        updatedAt: self.syncUpdatedAt,
-                        hasData: !!(self.todos.length || self.recycleBin.length),
-                        synced: self.syncSynced
-                    }, remote);
-                    if (plan.action === 'pull') {
-                        self.applyRemote(remote);
-                        self.syncLastAt = Date.now();
-                        self.syncStatus = 'synced';
-                    } else if (plan.action === 'merge') {
-                        return self.mergeRemote(remote).then(function () { self.syncLastAt = Date.now(); });
-                    } else if (plan.action === 'push') {
-                        // Seeding an empty remote: stamp a real version first so
-                        // cross-device ordering starts from a meaningful timestamp.
-                        if (!self.syncUpdatedAt) {
-                            self.syncUpdatedAt = nextStamp();
-                            saveSyncMeta({ updatedAt: self.syncUpdatedAt, synced: self.syncSynced });
-                        }
-                        return self.pushSync();
-                    } else { // none — already in sync
-                        self.syncSynced = true;
-                        saveSyncMeta({ updatedAt: self.syncUpdatedAt, synced: true });
-                        self.syncLastAt = Date.now();
-                        self.syncStatus = 'synced';
-                    }
+                    self._conflicts = 0; // a fresh look at the server starts the retry budget over
+                    if (self.reconcile(remote)) return self.pushSync();
+                    self.syncLastAt = Date.now();
+                    self.syncStatus = 'synced';
                 }).catch(function () {
                     self.syncAvailable = false;
                     if (!silent) { self.showSyncStatus = true; self.syncStatus = 'offline'; }

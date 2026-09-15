@@ -72,7 +72,7 @@ check "blank title -> 400" 400 "$(code -X POST -H "$A" -H "$J" -d '{"title":"   
 # ---- interop: an API write keeps the rest of a browser-pushed blob -----------
 T0=$(now_ms)
 check "sync.php JSON PUT -> 200" 200 "$(code -X PUT -b "todo_auth=$COOKIE" -H "$J" \
-    -d "{\"version\":1,\"updatedAt\":$T0,\"slogan\":\"keep me\",\"todos\":[{\"id\":\"tbrowser-0\",\"title\":\"from browser\",\"completed\":false,\"removed\":false,\"createdAt\":$T0}],\"recycleBin\":[]}" "$SYNC")"
+    -d "{\"version\":1,\"updatedAt\":$T0,\"baseUpdatedAt\":0,\"slogan\":\"keep me\",\"todos\":[{\"id\":\"tbrowser-0\",\"title\":\"from browser\",\"completed\":false,\"removed\":false,\"createdAt\":$T0}],\"recycleBin\":[]}" "$SYNC")"
 ID=$(curl -s -X POST -H "$A" -H "$J" -d '{"title":"from api"}' "$U" | jget task.id)
 BLOB=$(curl -s -b "todo_auth=$COOKIE" "$SYNC")
 check "API add keeps the browser's slogan" "keep me" "$(echo "$BLOB" | jget slogan)"
@@ -86,9 +86,37 @@ check "PATCH unknown id -> 404" 404 "$(code -X PATCH -H "$A" -H "$J" -d '{"compl
 check "DELETE marks the task removed" true "$(curl -s -X DELETE -H "$A" "$U&id=$ID" | jget task.removed)"
 check "deleted task is in recycleBin" "$ID" "$(curl -s -b "todo_auth=$COOKIE" "$SYNC" | jget recycleBin.0.id)"
 
+# ---- conflict check: a push must name the version it was based on -------------
+# The whole point: a browser push is a whole-blob overwrite, so it is only safe
+# when the sender was looking at what is stored right now. Anything else (an API
+# write, another device) must send it back to merge instead of burying the write.
+blob() { # updatedAt baseUpdatedAt slogan
+    printf '{"version":1,"updatedAt":%s,"baseUpdatedAt":%s,"slogan":"%s","todos":[],"recycleBin":[]}' "$1" "$2" "$3"
+}
+CUR=$(curl -s -b "todo_auth=$COOKIE" "$SYNC" | jget updatedAt)
+check "PUT without baseUpdatedAt -> 400" 400 "$(code -X PUT -b "todo_auth=$COOKIE" -H "$J" \
+    -d "{\"version\":1,\"updatedAt\":$(now_ms),\"todos\":[],\"recycleBin\":[]}" "$SYNC")"
+check "PUT with a stale baseUpdatedAt -> 409" 409 \
+    "$(code -X PUT -b "todo_auth=$COOKIE" -H "$J" -d "$(blob "$(now_ms)" 1 "stale push")" "$SYNC")"
+check "409 hands back the version the server holds" "$CUR" \
+    "$(curl -s -X PUT -b "todo_auth=$COOKIE" -H "$J" -d "$(blob "$(now_ms)" 1 "stale push")" "$SYNC" | jget current.updatedAt)"
+check "a refused push changes nothing" "$CUR" "$(curl -s -b "todo_auth=$COOKIE" "$SYNC" | jget updatedAt)"
+FRESH=$(now_ms)
+check "PUT naming the current version -> 200" 200 \
+    "$(code -X PUT -b "todo_auth=$COOKIE" -H "$J" -d "$(blob "$FRESH" "$CUR" "conflict check ok")" "$SYNC")"
+check "the accepted push is stored" "$FRESH" "$(curl -s -b "todo_auth=$COOKIE" "$SYNC" | jget updatedAt)"
+check "baseUpdatedAt is bookkeeping, not stored state" null \
+    "$(curl -s -b "todo_auth=$COOKIE" "$SYNC" | jget baseUpdatedAt)"
+# An API write moves the stored version, so the base a browser held is stale.
+curl -s -o /dev/null -X POST -H "$A" -H "$J" -d '{"title":"api moves the version"}' "$U"
+check "a push based on the pre-API version -> 409" 409 \
+    "$(code -X PUT -b "todo_auth=$COOKIE" -H "$J" -d "$(blob "$(now_ms)" "$FRESH" "would have buried it")" "$SYNC")"
+check "the API task is still there" "api moves the version" "$(curl -s -H "$A" "$U" | jget tasks.0.title)"
+
 # ---- updatedAt never goes backwards (browser clock ahead of the server) -------
 AHEAD=$(( $(now_ms) + 60000 ))
-curl -s -o /dev/null -X PUT -b "todo_auth=$COOKIE" -H "$J" -d "{\"version\":1,\"updatedAt\":$AHEAD,\"todos\":[],\"recycleBin\":[]}" "$SYNC"
+BASE=$(curl -s -b "todo_auth=$COOKIE" "$SYNC" | jget updatedAt)
+curl -s -o /dev/null -X PUT -b "todo_auth=$COOKIE" -H "$J" -d "{\"version\":1,\"updatedAt\":$AHEAD,\"baseUpdatedAt\":$BASE,\"todos\":[],\"recycleBin\":[]}" "$SYNC"
 AFTER=$(curl -s -X POST -H "$A" -H "$J" -d '{"title":"after skew"}' "$U" | jget updatedAt)
 check "API write stamps above a future browser stamp" yes "$([ "${AFTER:-0}" -gt "$AHEAD" ] && echo yes || echo no)"
 

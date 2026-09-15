@@ -9,8 +9,9 @@
  *   GET            -> 200 application/json, the stored blob (or {"updatedAt":0}
  *                     when nothing has been saved yet).
  *   PUT  / POST    -> store the request body (after validating it is a JSON
- *                     object sent as application/json — 415 otherwise),
- *                     200 {"ok":true,"updatedAt":N}.
+ *                     object sent as application/json — 415 otherwise, and
+ *                     that its `baseUpdatedAt` still matches what is stored —
+ *                     409 otherwise), 200 {"ok":true,"updatedAt":N}.
  *   anything else  -> 405.
  *
  * SECURITY / DESIGN NOTES
@@ -82,16 +83,36 @@ if ($method === 'PUT' || $method === 'POST') {
         send_json(400, array('ok' => false, 'error' => 'invalid JSON object'));
     }
 
-    // sync.php's contract is a whole-blob overwrite: whatever the browser
-    // sends REPLACES the stored blob, same as before the store.php
-    // extraction. The mutate callback ignores $current for exactly that
-    // reason — the lock still buys atomicity against a concurrent writer.
+    // Conflict check. A push is a whole-blob overwrite, so it is only safe if
+    // the sender was looking at what is stored right now: `baseUpdatedAt` is
+    // the stored `updatedAt` the client last pulled or pushed. If anything
+    // wrote since (api.php / the MCP server, another device, another tab),
+    // refuse with 409 and hand back the current blob so the client can
+    // three-way merge and retry. REQUIRED, not optional — a push that omits it
+    // is precisely the blind overwrite this check exists to stop.
+    if (!array_key_exists('baseUpdatedAt', $data) || !is_numeric($data['baseUpdatedAt'])) {
+        send_json(400, array('ok' => false, 'error' => 'baseUpdatedAt (number) is required'));
+    }
+    $base = (float) $data['baseUpdatedAt'];
+    unset($data['baseUpdatedAt']); // bookkeeping for the write, not part of the state
+
+    $conflict = null;
     try {
-        $next = todo_store_mutate(function ($current) use ($data) {
+        $next = todo_store_mutate(function ($current) use ($data, $base, &$conflict) {
+            $stored = (isset($current['updatedAt']) && is_numeric($current['updatedAt']))
+                ? (float) $current['updatedAt'] : 0.0;
+            if ($stored !== $base) {
+                $conflict = $current;
+                return null; // decline the write; the blob stays as it is
+            }
             return $data;
         });
     } catch (RuntimeException $e) {
         send_json(500, array('ok' => false, 'error' => 'write failed'));
+    }
+
+    if ($conflict !== null) {
+        send_json(409, array('ok' => false, 'error' => 'conflict', 'current' => $conflict));
     }
 
     $updatedAt = isset($next['updatedAt']) ? $next['updatedAt'] : 0;

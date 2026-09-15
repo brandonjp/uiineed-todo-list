@@ -321,15 +321,19 @@ test('realMoveIndices: same position / out of range / not found -> null', functi
     assert.strictEqual(core.realMoveIndices([A, B], [X, A], 0, 1), null); // X not in full
 });
 
-// ---- planSync: the cross-device last-write-wins decision -----------------
+// ---- planSync: the cross-device sync decision ----------------------------
 // planSync(local, remote) decides what a device should do when it sees the
-// remote blob. local = { updatedAt, hasData, synced }; remote = parsed blob
-// (or null/garbage). Returns { action: 'push' | 'pull' | 'merge' | 'none' }.
-//   push  -> our local copy is authoritative; upload it.
-//   pull  -> remote is newer; adopt it wholesale (blob last-write-wins).
-//   merge -> first contact on this device with a non-empty remote; union both
-//            (via the tested mergeImport path) so no offline work is lost.
-//   none  -> nothing to do.
+// remote blob. local = { updatedAt, hasData, synced, baseAt }; remote = parsed
+// blob (or null/garbage). Returns
+// { action: 'push' | 'pull' | 'rebase' | 'merge' | 'none' }.
+//   push   -> only this device moved on from the version both last agreed on.
+//   pull   -> only the server moved; adopt it.
+//   rebase -> BOTH moved; three-way merge (merge3), then upload.
+//   merge  -> first contact on this device; union via mergeImport.
+//   none   -> nothing to do.
+// The decision compares both sides against `baseAt` — the version this device
+// last pulled or pushed — rather than comparing two clocks, which is what lets
+// a tab notice someone else wrote while it was holding an edit.
 test('planSync: empty remote + local has data -> push (seed remote)', function () {
     assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: false }, null).action, 'push');
     assert.strictEqual(core.planSync({ updatedAt: 0, hasData: true, synced: false },
@@ -344,21 +348,131 @@ test('planSync: first contact with a non-empty remote -> merge (no data loss)', 
     // even if our local clock looks "newer", an un-synced device must union, not clobber
     assert.strictEqual(core.planSync({ updatedAt: 999, hasData: true, synced: false }, r).action, 'merge');
 });
-test('planSync: synced + remote newer -> pull', function () {
+test('planSync: only the server moved -> pull', function () {
     var r = { updatedAt: 200, todos: [{ id: 'a1', title: 'X' }] };
-    assert.strictEqual(core.planSync({ updatedAt: 100, hasData: true, synced: true }, r).action, 'pull');
+    assert.strictEqual(core.planSync({ updatedAt: 100, baseAt: 100, hasData: true, synced: true }, r).action, 'pull');
 });
-test('planSync: synced + local newer -> push', function () {
+test('planSync: only this device moved -> push', function () {
     var r = { updatedAt: 100, todos: [{ id: 'a1', title: 'X' }] };
-    assert.strictEqual(core.planSync({ updatedAt: 200, hasData: true, synced: true }, r).action, 'push');
+    assert.strictEqual(core.planSync({ updatedAt: 200, baseAt: 100, hasData: true, synced: true }, r).action, 'push');
 });
-test('planSync: synced + equal timestamps -> none', function () {
+test('planSync: both moved -> rebase (three-way merge)', function () {
     var r = { updatedAt: 150, todos: [{ id: 'a1', title: 'X' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 200, baseAt: 100, hasData: true, synced: true }, r).action, 'rebase');
+});
+test('planSync: REGRESSION — an API write is not overwritten by a dirty tab', function () {
+    // The v1.10.2 known limitation: the tab held an unsent edit (local stamp
+    // 200) when api.php wrote at 120 — a LOWER stamp, since the tab's clock ran
+    // ahead. Timestamp comparison said "local is newer, push", which buried the
+    // API task. Against the base version, both sides moved, so it merges.
+    var r = { updatedAt: 120, todos: [{ id: 'api-1', title: 'added by Claude' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 200, baseAt: 100, hasData: true, synced: true }, r).action, 'rebase');
+});
+test('planSync: nothing moved -> none', function () {
+    var r = { updatedAt: 150, todos: [{ id: 'a1', title: 'X' }] };
+    assert.strictEqual(core.planSync({ updatedAt: 150, baseAt: 150, hasData: true, synced: true }, r).action, 'none');
+});
+test('planSync: device synced before v1.11.0 (no base) rebases once, or is idle', function () {
+    var r = { updatedAt: 150, todos: [{ id: 'a1', title: 'X' }] };
+    // No ancestor recorded and the two disagree: merge with no base (keep both
+    // sides) rather than let either clobber the other.
+    assert.strictEqual(core.planSync({ updatedAt: 100, hasData: true, synced: true }, r).action, 'rebase');
+    // Same version on both sides: nothing to reconcile, just adopt the ancestor.
     assert.strictEqual(core.planSync({ updatedAt: 150, hasData: true, synced: true }, r).action, 'none');
 });
 test('planSync: garbage/non-object remote is treated as no data', function () {
-    assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: true }, 123).action, 'push');
-    assert.strictEqual(core.planSync({ updatedAt: 5, hasData: true, synced: true }, undefined).action, 'push');
+    assert.strictEqual(core.planSync({ updatedAt: 5, baseAt: 5, hasData: true, synced: true }, 123).action, 'push');
+    assert.strictEqual(core.planSync({ updatedAt: 5, baseAt: 5, hasData: true, synced: true }, undefined).action, 'push');
+});
+
+// ---- merge3: the three-way merge ----------------------------------------
+// merge3(base, local, remote) reconciles two sides that both moved on from a
+// common ancestor. Each side is { slogan, todos, recycleBin }. This is what
+// runs when a push is refused with 409 — it must lose nothing either side did.
+function st(todos, recycleBin, slogan) {
+    return { slogan: slogan, todos: todos || [], recycleBin: recycleBin || [] };
+}
+function tk(id, title, completed) {
+    return { id: id, title: title, completed: !!completed, removed: false };
+}
+function idsOf(list) { return list.map(function (t) { return t.id; }); }
+
+test('merge3: THE BUG — an API add and this tab\'s unsent edit both survive', function () {
+    // Tab pulled [a], then renamed it and added "mine" without pushing yet;
+    // meanwhile api.php (Claude) added "theirs" to the stored copy.
+    var base = st([tk('a', 'shared')]);
+    var local = st([tk('mine', 'typed in the tab'), tk('a', 'shared, renamed')]);
+    var remote = st([tk('theirs', 'added by Claude'), tk('a', 'shared')]);
+    var out = core.merge3(base, local, remote);
+    assert.deepStrictEqual(idsOf(out.todos), ['theirs', 'mine', 'a']); // arrival on top
+    assert.strictEqual(out.todos[2].title, 'shared, renamed');         // the tab's edit kept
+});
+test('merge3: add/add — both new tasks are kept', function () {
+    var out = core.merge3(st([tk('a', 'A')]), st([tk('l', 'L'), tk('a', 'A')]),
+        st([tk('r', 'R'), tk('a', 'A')]));
+    assert.deepStrictEqual(idsOf(out.todos), ['r', 'l', 'a']);
+});
+test('merge3: delete/delete — gone from both stays gone', function () {
+    var out = core.merge3(st([tk('a', 'A'), tk('b', 'B')]), st([tk('a', 'A')]), st([tk('a', 'A')]));
+    assert.deepStrictEqual(idsOf(out.todos), ['a']);
+});
+test('merge3: delete/edit — an edit beats a delete (nothing written is lost)', function () {
+    var base = st([tk('a', 'A'), tk('b', 'B')]);
+    var out = core.merge3(base, st([tk('a', 'A')]), st([tk('a', 'A'), tk('b', 'B edited')]));
+    assert.deepStrictEqual(idsOf(out.todos).sort(), ['a', 'b']);
+    assert.strictEqual(out.todos.filter(function (t) { return t.id === 'b'; })[0].title, 'B edited');
+});
+test('merge3: a delete the other side did not touch IS honoured', function () {
+    var base = st([tk('a', 'A'), tk('b', 'B')]);
+    var out = core.merge3(base, st([tk('a', 'A'), tk('b', 'B')]), st([tk('a', 'A')]));
+    assert.deepStrictEqual(idsOf(out.todos), ['a']);
+});
+test('merge3: different fields on the same task both apply', function () {
+    var base = st([tk('a', 'A', false)]);
+    var out = core.merge3(base, st([tk('a', 'A renamed', false)]), st([tk('a', 'A', true)]));
+    assert.strictEqual(out.todos[0].title, 'A renamed'); // local changed the title
+    assert.strictEqual(out.todos[0].completed, true);    // remote ticked it off
+});
+test('merge3: same field changed on both sides -> the tab wins', function () {
+    var base = st([tk('a', 'A')]);
+    var out = core.merge3(base, st([tk('a', 'local title')]), st([tk('a', 'remote title')]));
+    assert.strictEqual(out.todos[0].title, 'local title');
+});
+test('merge3: trashed remotely + completed locally lands in the bin, completed', function () {
+    var base = st([tk('a', 'A', false)]);
+    var local = st([tk('a', 'A', true)]);                      // ticked off here
+    var remote = st([], [{ id: 'a', title: 'A', completed: false, removed: true }]); // trashed there
+    var out = core.merge3(base, local, remote);
+    assert.deepStrictEqual(idsOf(out.todos), []);
+    assert.deepStrictEqual(idsOf(out.recycleBin), ['a']);
+    assert.strictEqual(out.recycleBin[0].completed, true);
+});
+test('merge3: restored remotely comes back out of the bin', function () {
+    var base = st([], [{ id: 'a', title: 'A', removed: true }]);
+    var out = core.merge3(base, st([], [{ id: 'a', title: 'A', removed: true }]), st([tk('a', 'A')]));
+    assert.deepStrictEqual(idsOf(out.todos), ['a']);
+    assert.deepStrictEqual(idsOf(out.recycleBin), []);
+});
+test('merge3: no known ancestor keeps both sides, local winning a clash', function () {
+    var out = core.merge3(null, st([tk('l', 'L'), tk('a', 'local title')]),
+        st([tk('r', 'R'), tk('a', 'remote title')]));
+    assert.deepStrictEqual(idsOf(out.todos).sort(), ['a', 'l', 'r']);
+    assert.strictEqual(out.todos.filter(function (t) { return t.id === 'a'; })[0].title, 'local title');
+});
+test('merge3: slogan — local edit wins, otherwise the remote one is adopted', function () {
+    var base = st([tk('a', 'A')], [], 'old');
+    assert.strictEqual(core.merge3(base, st([tk('a', 'A')], [], 'mine'),
+        st([tk('a', 'A')], [], 'theirs')).slogan, 'mine');
+    assert.strictEqual(core.merge3(base, st([tk('a', 'A')], [], 'old'),
+        st([tk('a', 'A')], [], 'theirs')).slogan, 'theirs');
+});
+test('merge3: does not mutate the inputs', function () {
+    var base = st([tk('a', 'A')]);
+    var local = st([tk('a', 'A renamed'), tk('l', 'L')]);
+    var remote = st([tk('a', 'A'), tk('r', 'R')]);
+    var snapshot = JSON.stringify([base, local, remote]);
+    core.merge3(base, local, remote);
+    assert.strictEqual(JSON.stringify([base, local, remote]), snapshot);
 });
 
 // ---- PHP id-format cross-check -------------------------------------------

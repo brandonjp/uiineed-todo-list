@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.10.2">
+    <meta name="version" content="1.11.0">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <title>Todo List Online 极简设计的网页版 Todo 清单 - 无需登陆 - By Ricocc</title>
     <meta name="keywords" content="无需登录, 不用账号,online todo, todo, todo list,在线Todo,网页todo,备忘录, Todo清单, 在线Todo清单,无需注册登陆,极简清单,即开即用,便签, 提醒, 日程, 记事本, 记事, 待办事件,online todolist, online 清单,online 待办事项,极简的待办事项" />
@@ -410,7 +410,7 @@
         </div>
     </div>
 
-    <script src="public/js/app.js?v=1.10.2"></script>
+    <script src="public/js/app.js?v=1.11.0"></script>
 
 
 </body>
