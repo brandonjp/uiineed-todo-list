@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.10.2] — 2026-09-15
+
+### Fixed
+- **An open tab or home-screen app no longer wipes out changes made elsewhere.**
+  The app only checked the server on page load, so a tab left open kept a stale
+  copy and its next edit pushed that whole copy over anything written since —
+  tasks added through the API / MCP server, or edits from another device. It now
+  re-syncs whenever the tab is shown again or the window regains focus, and sends
+  a pending edit immediately when the tab is hidden (rather than up to 1.5 s
+  later, when a suspended tab may not run it). The re-sync never runs over unsent
+  local edits and waits while a title or slogan edit is open.
+
+### Known limitation
+- Sync is still last-write-wins: an edit made in a visible tab while another write
+  lands can overwrite that write. A server-side conflict check is tracked in
+  `ROADMAP.md` §11.
+
 ## [1.10.1] — 2026-09-14
 
 ### Fixed
