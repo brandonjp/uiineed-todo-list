@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    var APP_VERSION = '1.10.1';
+    var APP_VERSION = '1.10.2';
 
     var HAS_DOM = (typeof window !== 'undefined' && typeof document !== 'undefined');
     var ACTIVE_LANG = (HAS_DOM && window.UIINEED_LANG === 'zh') ? 'zh' : 'en';
@@ -885,7 +885,41 @@
                 if (this.syncAvailable !== true) return; // unknown/offline -> stay local-only
                 var self = this;
                 clearTimeout(this._syncPushTimer);
-                this._syncPushTimer = setTimeout(function () { self.pushSync(); }, 1500);
+                this._syncPushTimer = setTimeout(function () {
+                    self._syncPushTimer = null; // null = nothing pending (flushSyncPush relies on it)
+                    self.pushSync();
+                }, 1500);
+            },
+            // Leaving the tab: send a pending debounced push now. A hidden or
+            // suspended tab may not run the timer until it's shown again — by
+            // which point resyncOnReturn could pull a newer copy over the edit.
+            flushSyncPush: function () {
+                if (!this._syncPushTimer) return;
+                clearTimeout(this._syncPushTimer);
+                this._syncPushTimer = null;
+                this.pushSync();
+            },
+            // Returning to the tab (shown again, bfcache restore, window focus):
+            // reconcile before the user edits. Without this, a tab or home-screen
+            // PWA synced only on load, so its next edit pushed a stale whole blob
+            // over anything written since — another device's edits, or tasks
+            // added through api.php / the MCP server. Still last-write-wins: an
+            // edit made while a remote write lands between returns can overwrite
+            // it (ROADMAP §11 tracks the server-side conflict check for that).
+            resyncOnReturn: function () {
+                // Unsent local edits are the newest intent: send them rather than
+                // risk pulling a remote copy over them.
+                if (this._syncPushTimer) { this.flushSyncPush(); return; }
+                if (this.syncAvailable === null) return;                     // first probe still running
+                if (!this.syncSynced && this.syncAvailable !== true) return; // no backend on this host
+                if (this.syncStatus === 'syncing' || this._resyncing) return;
+                if (this.editedTodo || this.isEditing) return; // a pull would orphan the open edit
+                var now = Date.now();
+                if (now - (this._lastResyncAt || 0) < 2000) return; // focus + visibilitychange arrive together
+                this._lastResyncAt = now;
+                var self = this;
+                this._resyncing = true;
+                return this.runSync({ silent: true }).then(function () { self._resyncing = false; });
             },
 
             buildSyncPayload: function () {
@@ -1444,9 +1478,22 @@
             };
             document.addEventListener('keydown', this.onKeydown);
             this.initSync(); // probe the optional sync backend and reconcile
+            // Re-sync when this tab comes back; send pending edits when it's left.
+            this._onVisibility = function () {
+                if (document.visibilityState === 'hidden') self.flushSyncPush();
+                else self.resyncOnReturn();
+            };
+            this._onPageShow = function (e) { if (e.persisted) self.resyncOnReturn(); };
+            this._onFocus = function () { self.resyncOnReturn(); };
+            document.addEventListener('visibilitychange', this._onVisibility);
+            window.addEventListener('pageshow', this._onPageShow);
+            window.addEventListener('focus', this._onFocus);
         },
         beforeDestroy: function () {
             document.removeEventListener('keydown', this.onKeydown);
+            document.removeEventListener('visibilitychange', this._onVisibility);
+            window.removeEventListener('pageshow', this._onPageShow);
+            window.removeEventListener('focus', this._onFocus);
             this.clearConfirm();
             clearTimeout(this._syncPushTimer);
         }

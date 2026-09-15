@@ -534,13 +534,27 @@ verification is now committed as `bash test/api.e2e.sh`. Design:
 - 🟢 MCP answers `ping`; API calls time out at 15 s; stored JSON is unescaped.
 
 ### ⬜ Follow-ups
-1. **An open tab silently erases API changes — REVIEW-3, owner's call, still open.**
-   `runSync()` runs only on page load and manual "Sync now"; a local edit pushes the
-   tab's whole blob without checking the server. Claude adds a task → you tick a box in
-   a tab or home-screen PWA opened before that → Claude's task is gone, no conflict
-   shown. Cheap mitigation: re-run `runSync()` on `visibilitychange` (covers a phone
-   waking). Full fix: `sync.php` 409s a PUT whose base `updatedAt` isn't the stored
-   one, and the client pulls + merges before retrying.
+1. ✅ **Open tab silently erased API changes — mitigated in v1.10.2.** `runSync()` ran
+   only on page load, so a tab or home-screen PWA opened before Claude added a task
+   pushed its stale blob over it on the next edit. Now `resyncOnReturn()` re-syncs on
+   `visibilitychange` / `pageshow` / window `focus`, and `flushSyncPush()` sends a
+   pending edit when the tab is hidden. Verified in a real browser against a local
+   server (see the v1.10.2 commit).
+1b. ⬜ **Server-side conflict check — the real fix; do this before relying on the API
+   heavily.** The residual loss window: an edit made in a *visible* tab while another
+   write lands (Claude adds a task while you're mid-session in the app) still
+   overwrites it, because `sync.php` accepts any whole-blob PUT. Reproduced in the
+   v1.10.2 browser check: an API task added while the tab held an unsent edit was
+   gone after the tab's push. Sketch:
+   - The client sends `baseUpdatedAt` (the stamp this tab last pulled or pushed) with
+     each PUT; `sync.php` 409s under the store lock when the stored `updatedAt`
+     differs. `api.php` needs nothing — it already read-modify-writes under the lock.
+   - On 409 the client does a **three-way merge**, not `mergeImport`: keep the base
+     blob in localStorage, and apply local changes (adds, edits, completions,
+     deletions vs. base) onto the fresh remote. A two-way union would resurrect
+     tasks deleted on either side.
+   - Tests: a stale-base PUT → 409 case in `test/api.e2e.sh`; pure three-way-merge
+     cases in `test/logic.test.js` (add/add, delete/edit, delete/delete).
 2. **Not deployed.** Live steps (mint token, confirm the `Authorization` header reaches
    PHP on the host, register the MCP server) are in git-ignored `DEPLOY.local.md` →
    "API + MCP". Deploy v1.10.1, not v1.10.0.
