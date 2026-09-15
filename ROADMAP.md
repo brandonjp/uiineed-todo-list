@@ -540,21 +540,36 @@ verification is now committed as `bash test/api.e2e.sh`. Design:
    `visibilitychange` / `pageshow` / window `focus`, and `flushSyncPush()` sends a
    pending edit when the tab is hidden. Verified in a real browser against a local
    server (see the v1.10.2 commit).
-1b. ⬜ **Server-side conflict check — the real fix; do this before relying on the API
-   heavily.** The residual loss window: an edit made in a *visible* tab while another
-   write lands (Claude adds a task while you're mid-session in the app) still
-   overwrites it, because `sync.php` accepts any whole-blob PUT. Reproduced in the
-   v1.10.2 browser check: an API task added while the tab held an unsent edit was
-   gone after the tab's push. Sketch:
-   - The client sends `baseUpdatedAt` (the stamp this tab last pulled or pushed) with
-     each PUT; `sync.php` 409s under the store lock when the stored `updatedAt`
-     differs. `api.php` needs nothing — it already read-modify-writes under the lock.
-   - On 409 the client does a **three-way merge**, not `mergeImport`: keep the base
-     blob in localStorage, and apply local changes (adds, edits, completions,
-     deletions vs. base) onto the fresh remote. A two-way union would resurrect
-     tasks deleted on either side.
-   - Tests: a stale-base PUT → 409 case in `test/api.e2e.sh`; pure three-way-merge
-     cases in `test/logic.test.js` (add/add, delete/edit, delete/delete).
+1b. ✅ **Server-side conflict check — shipped in v1.11.0 (2026-09-15).** The last
+   loss window is closed: an edit made in a *visible* tab while another write landed
+   (Claude adding a task while you are mid-session in the app) used to overwrite it,
+   because `sync.php` accepted any whole-blob PUT. What shipped:
+   - Every PUT carries `baseUpdatedAt` — the stored version this client last pulled
+     or pushed. `sync.php` compares it **under the store lock** (so it cannot race
+     the writer it is checking for) and 409s with the current blob in `current`. A
+     PUT without it is a 400: a client that can't name its base is exactly the blind
+     overwrite this stops. `api.php` needed nothing — it already read-modify-writes
+     under the lock. `todo_store_mutate()` grew a "return null = don't write" path
+     so the refusal leaves the stored bytes untouched.
+   - On 409 the client three-way merges (`merge3()` in `app.js`) the stored ancestor
+     + local + remote, per task and per field, then re-pushes; retries are capped at
+     3 and degrade to the normal "error" state. Not a two-way union — that would
+     resurrect tasks deleted on either side. The ancestor lives in localStorage
+     under `uiineed-sync-base`.
+   - `planSync()` now decides from **versions, not clocks**: only local moved →
+     push, only the server → pull, both → rebase. A device whose last sync predates
+     v1.11.0 has no ancestor recorded and does one ancestor-less merge (keep both
+     sides, local wins a clash) to get onto the scheme.
+   - Tests: `test/api.e2e.sh` covers stale-base → 409, missing base → 400, the
+     refused write being a no-op, `baseUpdatedAt` not being stored, and a push based
+     on the pre-API version; `test/logic.test.js` covers the version decisions and
+     12 `merge3` cases (add/add, delete/edit, delete/delete, honoured delete,
+     per-field, same-field clash, trash/restore, no-ancestor, slogan, no mutation).
+   - Verified in Chrome against a local `php -S` (v1.11.0): tab saves "shared task"
+     → `api.php` adds "added by Claude" → the tab, which never re-synced, saves a
+     third task; its push is refused (`409`), merged, and re-pushed (`200`), leaving
+     all three on both sides with no console errors and no PHP warnings. The same
+     sequence on v1.10.2 lost the API task.
 2. ✅ **Deployed 2026-09-15 (v1.10.2).** Token minted, `Authorization` header confirmed
    reaching PHP on the host, MCP server registered in Claude Code as `todo`, live data
    verified identical to the pre-deploy backup. Details, backups, and rollback are in

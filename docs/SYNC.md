@@ -11,10 +11,19 @@ list follow you across devices. If you don't deploy it, nothing changes.
   directly downloadable.
 - **`GET sync.php`** returns the blob; **`PUT sync.php`** (JSON body) stores it.
   Writes are atomic (temp file + `rename`, with `LOCK_EX`) and capped at 5 MB.
-- **Reconciliation is blob-level last-write-wins** by `updatedAt` (see `planSync()`
-  in `public/js/app.js`): the newer whole snapshot wins, so deletions propagate.
-  The one exception is the **first sync on a new device**, which *unions* local +
-  remote so you never lose work the first time you connect.
+- **Every write names the version it was based on.** A `PUT` must carry
+  `baseUpdatedAt` — the stored `updatedAt` the client last pulled or pushed. If
+  the stored blob has moved on since (another device, or `api.php`), the write is
+  refused with **409** and the current blob comes back in `current`, so a
+  whole-blob push can never bury a write it never saw. The check happens under
+  the storage lock, so it can't race the writer it is checking for.
+- **Reconciliation compares versions, not clocks** (see `planSync()` in
+  `public/js/app.js`): only this device moved → push, only the server moved →
+  pull, **both moved → three-way merge** (`merge3()`) against the last agreed
+  snapshot, then push. Merging per field against a common ancestor is what
+  separates an edit from a deletion, so neither side's work is lost and deleted
+  tasks don't come back. The one exception is the **first sync on a new device**,
+  which *unions* local + remote so you never lose work the first time you connect.
 - The client **probes on load** and reconciles, and **debounces a `PUT` on every
   change**. A manual **"Sync now"** lives in the ⌘K palette, the **More** menu, and
   as a clickable status row in the sidebar.
@@ -52,11 +61,13 @@ With the site behind Basic Auth (`user:pass`):
 curl -u 'user:pass' https://YOUR-HOST/sync.php
 # -> {"updatedAt":0}
 
-# Write a blob:
+# Write a blob (baseUpdatedAt = the stored updatedAt you just read; 0 when empty):
 curl -u 'user:pass' -X PUT -H 'Content-Type: application/json' \
-  --data '{"updatedAt":1,"todos":[{"id":"t1","title":"hello","completed":false}],"recycleBin":[]}' \
+  --data '{"updatedAt":1,"baseUpdatedAt":0,"todos":[{"id":"t1","title":"hello","completed":false}],"recycleBin":[]}' \
   https://YOUR-HOST/sync.php
 # -> {"ok":true,"updatedAt":1}
+# Repeat that same command and it is refused, because the stored version is now 1:
+# -> 409 {"ok":false,"error":"conflict","current":{...}}
 
 # Read it back:
 curl -u 'user:pass' https://YOUR-HOST/sync.php
@@ -67,8 +78,10 @@ Then: add a todo in one browser, refresh a second browser — the todo appears.
 
 ## Limitations (by design)
 
-- **Rudimentary, not real-time.** Last-write-wins on the whole blob — concurrent
-  edits on two devices in the same window will keep only the most recent one.
-  A page refresh is how you pull the latest.
-- No conflict UI, no per-item merge, no history. If you want stronger guarantees,
-  the `ROADMAP.md` §3 sketches a hosted "Sync ID" upgrade path.
+- **Not real-time.** The client reconciles on load, when a tab is shown again or
+  regains focus, on a manual "Sync now", and whenever a save is refused as stale.
+  Nothing is pushed to an idle tab in between.
+- **No conflict UI and no history.** Conflicts are resolved silently by
+  `merge3()`: per task and per field, the side that changed it wins, and if both
+  changed the same field the local one does. If you want stronger guarantees, the
+  `ROADMAP.md` §3 sketches a hosted "Sync ID" upgrade path.

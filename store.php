@@ -39,6 +39,11 @@ function todo_store_read() {
  * the same directory, so a concurrent reader never sees a half-written
  * file). Returns the array that was written.
  *
+ * $fn may return NULL to abort the write and leave the stored blob untouched
+ * — how sync.php declines a push whose base version no longer matches. The
+ * decision has to happen in here, under the lock, or it would race the very
+ * writer it is checking for. Returns null in that case.
+ *
  * The lock's job is narrow: stop two overlapping read-modify-write calls
  * (e.g. two API writes issued back to back) from interleaving and losing one
  * of the two changes. It does NOT protect against a stale browser tab
@@ -60,6 +65,9 @@ function todo_store_mutate($fn) {
     try {
         $current = todo_store_read();
         $next = $fn($current);
+        if ($next === null) {
+            return null; // the callback declined to write
+        }
         if (!is_array($next)) {
             throw new RuntimeException('mutation callback did not return an array');
         }

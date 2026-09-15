@@ -5,7 +5,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="version" content="1.10.2">
+        <meta name="version" content="1.11.0">
         <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
         <title>Todo List Online - Minimalist, No-Login Required Web Todo App</title>
         <meta
@@ -465,7 +465,7 @@
 
             </div>
         </div>
-        <script src="public/js/app.js?v=1.10.2"></script>
+        <script src="public/js/app.js?v=1.11.0"></script>
     </body>
 
 </html>
